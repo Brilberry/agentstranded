@@ -272,8 +272,8 @@ class Simulation:
         self.social_random = random.Random(seed + 411)
         self.tick = 0
         self.ended_tick: int | None = None
-        self.day_length = 80
-        from .climate import Climate
+        from .climate import Climate, TICKS_PER_DAY
+        self.day_length = TICKS_PER_DAY
         self.climate = Climate(seed, starting_season)
         self.conditions = self.climate.at(0, self.day_length)
         self.messages: deque[Message] = deque(maxlen=100)

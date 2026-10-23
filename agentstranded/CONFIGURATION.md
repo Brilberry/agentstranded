@@ -165,7 +165,8 @@ resource counts and predator pressure vary:
 
 First wave occurs at the interval. Two wolf waves then one bear wave repeat.
 All presets share a seeded temperate climate, starting in spring unless configured
-otherwise; seasons last 800 ticks. Lightning uses a 0.4% base chance modified by
+otherwise; seasons last 92/92/91/90 days (spring/summer/autumn/winter), with 80
+ticks per 24-hour day and 29,200 ticks per 365-day year. Lightning uses a 0.4% base chance modified by
 weather. See the example guide for temperature, exposure, and shelter behavior.
 Newcomer arrivals have been removed
 from every mode. Every competition ends at its tick limit or final survivor death.

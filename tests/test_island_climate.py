@@ -4,14 +4,39 @@ import pytest
 
 from bbagents import ToolCall
 from agentstranded import Simulation
-from agentstranded.climate import Climate, Conditions, SEASONS
+from agentstranded.climate import (Climate, Conditions, SEASONS, SEASON_DAYS,
+                                  DAYS_PER_YEAR, TICKS_PER_DAY,
+                                  NORMAL_TICKS_PER_SECOND, time_of_day)
 from agentstranded.competition import validate_competition
 
 
 def test_default_and_northern_season_order_and_repeat():
     climate = Climate(17)
-    assert [climate.at(day * 80, 80).season for day in (0, 10, 20, 30, 40)] == [*SEASONS, "spring"]
-    assert Climate(17, "winter").at(800, 80).season == "spring"
+    assert [climate.at(day * 80, 80).season for day in (0, 92, 184, 275, 365)] == [*SEASONS, "spring"]
+    assert Climate(17, "winter").at(90 * 80, 80).season == "spring"
+
+
+@pytest.mark.parametrize("start", SEASONS)
+def test_calendar_boundaries_for_every_starting_season(start):
+    climate = Climate(17, start)
+    day = 0
+    for offset in range(4):
+        season = SEASONS[(SEASONS.index(start) + offset) % 4]
+        assert climate.at(day * TICKS_PER_DAY, TICKS_PER_DAY).season == season
+        day += SEASON_DAYS[season]
+        assert climate.at(day * TICKS_PER_DAY - 1, TICKS_PER_DAY).season == season
+    assert day == DAYS_PER_YEAR == 365
+    assert climate.at(day * TICKS_PER_DAY, TICKS_PER_DAY).season == start
+
+
+def test_one_real_hour_per_year_and_24_hour_days():
+    assert DAYS_PER_YEAR * TICKS_PER_DAY / NORMAL_TICKS_PER_SECOND == pytest.approx(3600)
+    assert 24 * 60 / TICKS_PER_DAY == 18
+    assert time_of_day(0) == "00:00"
+    assert time_of_day(1) == "00:18"
+    assert time_of_day(40) == "12:00"
+    assert time_of_day(79) == "23:42"
+    assert time_of_day(80) == "00:00"
 
 
 def test_weather_is_seeded_and_season_appropriate():

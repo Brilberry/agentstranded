@@ -11,7 +11,12 @@ leather clothing, and shelter reservoirs, see [Survival systems](SURVIVAL_SYSTEM
 The island uses a northern-hemisphere temperate climate. **Spring is the default
 and gentlest starting season**: mild temperatures, no snow or heatwaves, and
 occasional rain. Seasons advance **spring → summer → autumn → winter**, lasting
-10 simulation days each (800 ticks; a year is 3,200 ticks). Weather changes daily;
+three calendar months each in a non-leap 365-day year: spring and summer last
+92 days each, autumn 91, and winter 90. Each 24-hour day lasts 80 ticks, so a tick
+advances 18 simulated minutes. At normal speed (8.111 ticks/second), a year is
+29,200 ticks and takes one real hour of unpaused play, provided the simulation
+can keep up. Pausing, changing speed, or slow processing changes real elapsed time.
+Weather changes daily;
 nights are 5°C cooler. The sidebar, observations, model context, and reports show
 the current season, weather, and temperature.
 

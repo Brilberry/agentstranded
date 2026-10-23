@@ -3,7 +3,17 @@ from dataclasses import dataclass
 import random
 
 SEASONS = ("spring", "summer", "autumn", "winter")
-SEASON_DAYS = 10
+SEASON_DAYS = {"spring": 92, "summer": 92, "autumn": 91, "winter": 90}
+DAYS_PER_YEAR = sum(SEASON_DAYS.values())
+TICKS_PER_DAY = 80
+SECONDS_PER_YEAR = 3600
+NORMAL_TICKS_PER_SECOND = DAYS_PER_YEAR * TICKS_PER_DAY / SECONDS_PER_YEAR
+
+
+def time_of_day(tick, day_length=TICKS_PER_DAY):
+    """24-hour clock; each default tick advances 18 simulated minutes."""
+    minutes = (tick % day_length) * 24 * 60 // day_length
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
 @dataclass(frozen=True)
@@ -27,7 +37,13 @@ class Climate:
 
     def at(self, tick, day_length):
         day = tick // day_length
-        season = SEASONS[(SEASONS.index(self.starting_season) + day // SEASON_DAYS) % 4]
+        remaining = day % DAYS_PER_YEAR
+        start = SEASONS.index(self.starting_season)
+        for offset in range(4):
+            season = SEASONS[(start + offset) % 4]
+            if remaining < SEASON_DAYS[season]:
+                break
+            remaining -= SEASON_DAYS[season]
         rng = random.Random(self.seed + 1101 + day * 7919)
         roll = rng.random()
         rain = {"spring": 0.25, "summer": 0.2, "autumn": 0.4, "winter": 0.25}[season]

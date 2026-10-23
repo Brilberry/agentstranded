@@ -5,6 +5,7 @@ from __future__ import annotations
 from .simulation import Resource, Simulation, Terrain
 from .reporting import ReportManager
 from .report_view import PostmortemExport
+from .climate import NORMAL_TICKS_PER_SECOND, time_of_day
 
 
 COLORS = {
@@ -70,7 +71,7 @@ def run(*, model: str | None = None, endpoint: str = "http://localhost:11434/api
     font = pygame.font.SysFont("menlo", 14)
     small = pygame.font.SysFont("menlo", 12)
     paused = bool(screenshot)
-    ticks_per_second = 8
+    ticks_per_second = NORMAL_TICKS_PER_SECOND
     accumulator = 0.0
     agent_offset = 0
     running = True
@@ -219,9 +220,9 @@ def run(*, model: str | None = None, endpoint: str = "http://localhost:11434/api
 
             left = sim.world.size * tile_size + 14
             living_predators = sum(predator.alive for predator in sim.predators)
-            status = f"Day {sim.tick // sim.day_length + 1} · {'Night' if sim.is_night else 'Daylight'} · Tick {sim.tick}"
+            status = f"Day {sim.tick // sim.day_length + 1} · {time_of_day(sim.tick, sim.day_length)} · {'Night' if sim.is_night else 'Daylight'}"
             screen.blit(font.render(status, True, (235, 235, 235)), (left, 10))
-            speed = "Game over" if sim.game_over else "Help (paused)" if help_open else "Paused" if paused else f"Speed {ticks_per_second} ticks/s"
+            speed = "Game over" if sim.game_over else "Help (paused)" if help_open else "Paused" if paused else f"Speed {ticks_per_second:.3f} ticks/s"
             population = sum(agent.alive for agent in sim.agents)
             screen.blit(small.render(f"{speed} · Alive {population}/{len(sim.agents)} · Predators {living_predators} · Scroll", True, (150, 155, 160)), (left, 31))
             if model:
