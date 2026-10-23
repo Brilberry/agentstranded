@@ -48,6 +48,8 @@ def test_renderer_freezes_final_state_and_saves_reports(monkeypatch, tmp_path, c
     monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
     pygame = pytest.importorskip("pygame")
     from agentstranded import app
+    from agentstranded import report_view
+    monkeypatch.setattr(report_view.webbrowser, "open", lambda url: True)
 
     simulation = Simulation(agents=1, predator_interval=None, lightning_probability=0)
     simulation.agents[0].health, simulation.agents[0].hunger = 1, 95
@@ -62,3 +64,20 @@ def test_renderer_freezes_final_state_and_saves_reports(monkeypatch, tmp_path, c
     assert "Game over at tick 1" in capsys.readouterr().out
     assert "Died at tick 1" in (tmp_path / "survival-report.md").read_text()
     assert "simulation.ended" in (tmp_path / "survival-report.md").read_text()
+    assert (tmp_path / "survival-report.html").exists()
+
+
+def test_ctrl_c_does_not_start_postmortem_export(monkeypatch, tmp_path):
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    pygame = pytest.importorskip("pygame")
+    from agentstranded import app, report_view
+
+    def interrupt():
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(pygame.event, "get", interrupt)
+    monkeypatch.setattr(report_view.PostmortemExport, "start",
+                        lambda self: pytest.fail("Ctrl+C started postmortems"))
+    app.run(report_dir=str(tmp_path), postmortems=False)
+    assert (tmp_path / "survival-report.md").exists()
+    assert not (tmp_path / "survival-report.html").exists()

@@ -29,8 +29,9 @@ For an installed Ollama model:
 python -m agentstranded.app --model qwen3.5:4b
 ```
 
-Reports are saved under `survival-runs/`. The Game Over dialog can generate a
-Markdown report and open its HTML rendering in your browser.
+Reports are saved under `survival-runs/`. Natural simulation completion automatically
+generates postmortems and opens the HTML report in your browser. Ctrl+C during play
+saves raw evidence only, without generating postmortems.
 
 ## Documentation
 

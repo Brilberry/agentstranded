@@ -5,6 +5,34 @@ from agentstranded.reporting import ReportManager, last_window, survivor_events
 from agentstranded.simulation import Predator
 
 
+def test_interrupted_run_saves_evidence_without_requesting_postmortems(tmp_path):
+    sim = Simulation(agents=2, predator_interval=None, lightning_probability=0)
+    manager = ReportManager(sim, directory=tmp_path, model="fake",
+                            requester=lambda *args: (_ for _ in ()).throw(AssertionError("unexpected inference")))
+    sim.agents[0].health, sim.agents[0].hunger = 1, 95
+    sim.step()
+    manager.update(generate=False)
+    assert not manager.futures and not manager.submitted
+    manager.close(generate=False)
+    assert not manager.futures
+    assert "Died at tick" in (tmp_path / "survival-report.md").read_text()
+
+
+def test_deferred_analysis_replaces_alive_placeholder_at_completion(tmp_path):
+    sim = Simulation(agents=1, predator_interval=None, lightning_probability=0)
+    manager = ReportManager(sim, directory=tmp_path, model="fake", requester=lambda *args: {
+        "summary": "Death explained.", "likely_contributors": [],
+        "uncertainties": [], "evidence_ticks": [1]})
+    manager.save()
+    sim.agents[0].health, sim.agents[0].hunger = 1, 95
+    sim.step()
+    manager.update(generate=False)
+    manager.close()
+    report = (tmp_path / "survival-report.md").read_text()
+    assert "Death explained." in report
+    assert "this survivor is alive at this save" not in report
+
+
 def test_damage_and_death_are_attributed_once_to_survivor():
     simulation = Simulation(agents=1, predator_interval=None, lightning_probability=0)
     agent = simulation.agents[0]

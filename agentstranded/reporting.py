@@ -35,7 +35,11 @@ def saved_analysis(report: Path, agent_id: str) -> str:
                 lines.append(line)
             if line.strip() == start:
                 inside = True
-    return "".join(lines).strip()
+    content = "".join(lines).strip()
+    # Placeholders are status messages, not completed analyses to preserve.
+    if content.startswith(("No death analysis:", "If model analysis was enabled,")):
+        return ""
+    return content
 
 
 def save_analysis(report: Path, content: str, agent_id: str) -> None:
@@ -301,6 +305,7 @@ class ReportManager:
         self.model, self.endpoint, self.requester = model, endpoint, requester
         self.pool = ThreadPoolExecutor(max_workers=1) if model else None
         self.submitted: set[str] = set()
+        self.saved_deaths: set[str] = set()
         self.futures = []
         self.closed = False
 
@@ -308,12 +313,16 @@ class ReportManager:
         write_reports(self.simulation, self.directory)
         print(f"Survival report: {(self.directory / REPORT_NAME).resolve()}", flush=True)
 
-    def update(self):
+    def update(self, *, generate=True):
         dead = [agent for agent in self.simulation.agents if not agent.alive
                 and agent.death_tick is not None and agent.id not in self.submitted]
         if not dead:
             return
-        self.save()  # Raw evidence is available before model analysis begins.
+        if any(agent.id not in self.saved_deaths for agent in dead):
+            self.save()  # Raw evidence is available before model analysis begins.
+            self.saved_deaths.update(agent.id for agent in dead)
+        if not generate:
+            return
         for agent in dead:
             self.submitted.add(agent.id)
             if self.pool:
@@ -323,10 +332,10 @@ class ReportManager:
                     model=self.model, endpoint=self.endpoint, trace=self.simulation.trace,
                     requester=self.requester, gate=self.gate))
 
-    def close(self):
+    def close(self, *, generate=True):
         if self.closed:
             return
-        self.update()
+        self.update(generate=generate)
         self.save()
         if self.pool:
             if any(not future.done() for future in self.futures):

@@ -352,16 +352,18 @@ plan used for night preparation and survival responses.
 
 ### Traces and survivor postmortems
 
-After the final survivor dies, the **Game Over** dialog has a **Generate
-postmortem** button (Enter also works). It finishes pending model summaries in
+When the simulation ends naturally, postmortem generation starts automatically.
+The **Game Over** dialog shows progress and allows reopening or retrying the export.
+It generates model summaries in
 the background, retains the Markdown report, and creates `survival-report.html`
 beside it, opening the HTML automatically in your default browser. Without a
 model it still exports all recorded evidence. The HTML has expandable event logs
 and treats messages/model output as inert text. Generation errors allow a retry;
 if browser launch fails, the saved path is printed for manual opening.
 
-Close the window, press **Escape**, or interrupt with Ctrl+C to finish a run and
-save its reports. Reports are also saved when a survivor dies; press **R** to save
+Close the window, press **Escape**, or interrupt with Ctrl+C during play to save
+the raw Markdown report without starting model postmortems or an HTML export.
+Raw reports are also saved when a survivor dies; press **R** to save
 an intermediate snapshot. The terminal prints the path to `survival-report.md`,
 which contains every survivor's history. By default, every run gets a unique directory under
 `survival-runs/` (ignored by Git).
@@ -387,7 +389,8 @@ damage, and deaths. Tool calls identify rule decisions, model decisions, and
 waiting for inference. A fatal predator attack is recorded separately from
 starvation, dehydration, or exhaustion damage, making the final cause inspectable.
 
-With `--model`, a death automatically queues a background analysis using the same
+With `--model`, natural simulation completion queues each deceased survivor's
+background analysis using the same
 Ollama model. It receives that survivor's events from the final 200 simulation ticks,
 ending at the death tick, even if the game continues afterward. `ContextBuilder`
 limits the input to 60,000 characters, prioritizing damage and death evidence;

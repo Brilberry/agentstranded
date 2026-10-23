@@ -137,7 +137,7 @@ def run(*, model: str | None = None, endpoint: str = "http://localhost:11434/api
                 export.poll()
                 reports_closed = reports.closed
             if reports and not reports_closed and not sim.game_over:
-                reports.update()
+                reports.update(generate=False)
 
             if sim.game_over:
                 paused, accumulator = True, 0.0
@@ -149,9 +149,8 @@ def run(*, model: str | None = None, endpoint: str = "http://localhost:11434/api
                     print(f"Game over at tick {sim.tick}: {reason}.", flush=True)
                     if reports:
                         reports.save()
-                if reports and not reports_closed and any(agent.alive for agent in sim.agents) and all(future.done() for future in reports.futures):
-                    reports.close()  # Finalize once background postmortems finish, without freezing the UI.
-                    reports_closed = True
+                    if export:
+                        export.start()  # Natural completion, not process interruption.
 
             screen.fill((20, 22, 25))
             for y, row in enumerate(sim.world.tiles):
@@ -349,7 +348,7 @@ def run(*, model: str | None = None, endpoint: str = "http://localhost:11434/api
         if not game_over_handled and hasattr(sim.policy, "close"):
             sim.policy.close()
         if reports and not reports.closed:
-            reports.close()
+            reports.close(generate=False)
 
 if __name__ == "__main__":
     import argparse
