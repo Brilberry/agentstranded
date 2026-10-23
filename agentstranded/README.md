@@ -1,4 +1,4 @@
-# Survival Island
+# Agent Stranded
 
 Start with the [overview and run instructions](OVERVIEW.md) for the observation →
 decision → execution → feedback loop, setup, controls, and reporting.

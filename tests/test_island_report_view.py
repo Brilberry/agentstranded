@@ -16,7 +16,7 @@ def ended():
 
 def test_html_keeps_markdown_and_embeds_all_evidence_safely(tmp_path):
     source = tmp_path / "survival-report.md"
-    source.write_text('''# Survival Island report
+    source.write_text('''# Agent Stranded report
 - [Ari](#agent-1)
 <a id="agent-1"></a>
 ## Ari
@@ -33,6 +33,9 @@ Recorded cause: starvation.
     original = source.read_text()
     target = render_html(source)
     html = target.read_text()
+    assert "<title>Agent Stranded — Postmortem</title>" in html
+    assert "Agent Stranded report" in html
+    assert "Survival Island" not in html
     assert source.read_text() == original
     assert '<a href="#agent-1">Ari</a>' in html
     assert '<a id="agent-1"></a>' in html

@@ -1,4 +1,4 @@
-# Survival Island: overview and running the simulation
+# Agent Stranded: overview and running the simulation
 
 
 Survivors now learn gardening, fire-making/cooking, skinning/leatherworking, and
@@ -58,7 +58,7 @@ free, quote a price, propose a trade, or invite a construction partner—and the
 other survivor can refuse. Model context includes only encountered survivors and
 voluntarily advertised supplies; inference limits still apply.
 
-![Survival Island after 120 ticks with the reference policy](screenshot.png)
+![Agent Stranded after 120 ticks with the reference policy](screenshot.png)
 
 ### How it works
 

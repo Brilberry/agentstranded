@@ -1,4 +1,4 @@
-"""Agent-driven survival-island simulation."""
+"""Agent Stranded: an autonomous survival simulation."""
 
 from .simulation import Simulation
 

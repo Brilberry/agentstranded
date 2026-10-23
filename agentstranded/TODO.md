@@ -1,4 +1,4 @@
-# Survival Island — feature backlog
+# Agent Stranded — feature backlog
 
 Unchecked entries are future ideas; sections marked DONE are implemented.
 Each numbered section can be selected as a separate implementation task.

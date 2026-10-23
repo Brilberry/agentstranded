@@ -6,7 +6,7 @@ Powered by [bbagents](https://github.com/Brilberry/bbagents), demonstrating plan
 tools, memory, skills, communication, authorization, and tracing in a complete game.
 Run with the built-in policy or optionally use a local Ollama model.
 
-![Survival Island](agentstranded/screenshot.png)
+![Agent Stranded](agentstranded/screenshot.png)
 
 ## Run
 

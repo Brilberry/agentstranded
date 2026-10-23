@@ -1,4 +1,4 @@
-"""Deterministic, headless survival-island simulation.
+"""Agent Stranded's deterministic, headless survival simulation.
 
 The world owns state transitions.  Agents may choose only from registered tools;
 they never mutate world state directly.  This keeps a future model-backed policy

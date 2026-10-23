@@ -30,7 +30,7 @@ def render_html(markdown: Path) -> Path:
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
-<title>Survival Island — Postmortem</title>
+<title>Agent Stranded — Postmortem</title>
 <style>
 :root{color-scheme:dark light}body{font:16px/1.65 system-ui,sans-serif;max-width:1050px;margin:40px auto;padding:0 24px}
 h1,h2,h3{line-height:1.25}h2{margin-top:2em;border-bottom:1px solid #8886;padding-bottom:.4em}

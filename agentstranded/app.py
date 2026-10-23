@@ -1,4 +1,4 @@
-"""Pygame-ce visualization for the survival-island simulation."""
+"""Pygame-ce visualization for Agent Stranded."""
 
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ def run(*, model: str | None = None, endpoint: str = "http://localhost:11434/api
     reports = (ReportManager(sim, directory=report_dir, model=model if postmortems else None,
                              endpoint=endpoint) if not screenshot else None)
     screen = pygame.display.set_mode((sim.world.size * tile_size + sidebar, sim.world.size * tile_size))
-    pygame.display.set_caption("bbagents — Survival Island")
+    pygame.display.set_caption("Agent Stranded")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("menlo", 14)
     small = pygame.font.SysFont("menlo", 12)
@@ -353,7 +353,7 @@ def run(*, model: str | None = None, endpoint: str = "http://localhost:11434/api
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Survival Island")
+    parser = argparse.ArgumentParser(description="Agent Stranded")
     parser.add_argument("--model", help="Ollama model name; omit for reference policy")
     parser.add_argument("--team", help="Team JSON5 file")
     parser.add_argument("--competition", help="Competition JSON file")

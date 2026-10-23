@@ -96,7 +96,7 @@ def _write_reports(simulation, directory: Path) -> None:
 
 
 def report_lines(simulation, analyses):
-    yield "# Survival Island report\n"
+    yield "# Agent Stranded report\n"
     yield f"Simulation stopped/saved at tick {simulation.tick}."
     yield f"Climate: {simulation.conditions.season}, {simulation.conditions.weather}, {simulation.conditions.temperature:g}°C."
     yield f"Status: {'finished' if simulation.game_over else 'in progress'}."
