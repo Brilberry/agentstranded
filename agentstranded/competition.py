@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+from .settings import DEFAULTS
 
 GOALS = ["escape_danger", "secure_water", "find_food", "recover",
          "establish_shelter", "learn_skills", "help_others", "explore"]
@@ -13,12 +14,8 @@ PREFERENCES = {"shelter": ("solo", "shared", "either"),
                "combat": ("avoid", "defend"),
                "knowledge": ("share", "trade", "private"),
                "food": ("berries", "fish", "adaptive")}
-DEFAULT_BEHAVIOR = {"priorities": GOALS, "thresholds": {"hunger": 6, "thirst": 5, "energy": 4},
-    "preferences": {"shelter": "either", "combat": "avoid", "knowledge": "share", "food": "adaptive"},
-    "trading": {"enabled": True, "reserve": 2}}
-MAPS = {"easy-island": {"resources": 2, "regrowth": 4, "predator_interval": 500},
-        "balanced-island": {"resources": 1, "regrowth": 2, "predator_interval": 250},
-        "hard-island": {"resources": 0.5, "regrowth": 1, "predator_interval": 125}}
+DEFAULT_BEHAVIOR = DEFAULTS["behavior"]
+MAPS = DEFAULTS["maps"]
 
 
 def obj(value, keys, path, required=()):
@@ -171,7 +168,8 @@ def compete(team, competition):
     import bbagents
     engine_digest = hashlib.sha256()
     for directory in (Path(__file__).parent, Path(bbagents.__file__).parent):
-        for source in sorted(directory.rglob("*.py")):
+        for source in sorted(path for path in directory.rglob("*")
+                             if path.suffix in {".py", ".json", ".json5"}):
             engine_digest.update(str(source.relative_to(directory)).encode())
             engine_digest.update(source.read_bytes())
     return {"engine_version": version("bbagents"), "ruleset_version": competition["ruleset_version"],

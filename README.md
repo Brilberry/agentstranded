@@ -36,6 +36,16 @@ saves raw evidence only, without generating postmortems.
 
 ## Documentation
 
+Default survivor profiles, seeded trait ranges, simulation settings, map presets,
+and behavior defaults are in [defaults.json](agentstranded/configs/defaults.json).
+Edit it and restart the game to change normal play. Competition settings are in
+[competition.json](agentstranded/configs/competition.json); custom teams can use
+[team.json5](agentstranded/configs/team.json5).
+`survivor_state` supplies shared starting needs and physical attributes; an
+individual profile can override them with a `state` object. Intelligence and
+personality ranges in this engine-default file use the internal 0–100 scale;
+competition team files continue to use the documented 1–10 attribute scale.
+
 - [Overview, framework loop, controls, and reports](agentstranded/OVERVIEW.md)
 - [Game mechanics](agentstranded/README.md)
 - [Skills, recipes, and survival systems](agentstranded/SURVIVAL_SYSTEMS.md)

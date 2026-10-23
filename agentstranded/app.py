@@ -6,6 +6,7 @@ from .simulation import Resource, Simulation, Terrain
 from .reporting import ReportManager
 from .report_view import PostmortemExport
 from .climate import NORMAL_TICKS_PER_SECOND, time_of_day
+from .settings import SIMULATION_DEFAULTS
 
 
 COLORS = {
@@ -56,7 +57,8 @@ def run(*, model: str | None = None, endpoint: str = "http://localhost:11434/api
                                 settings["seeds"][0] if seed is None else seed)
     else:
         sim = (Simulation() if seed is None and starting_season is None else
-               Simulation(seed=7 if seed is None else seed, starting_season=starting_season or "spring"))
+               Simulation(seed=SIMULATION_DEFAULTS["seed"] if seed is None else seed,
+                          starting_season=starting_season or SIMULATION_DEFAULTS["starting_season"]))
     if screenshot:
         for _ in range(120):
             sim.step()

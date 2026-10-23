@@ -22,6 +22,7 @@ from bbagents.organization import Message as AgentMessage
 from .tracing import IslandTrace
 from .progression import NUTRITION
 from .social import SocialTraits, SocialWorld
+from .settings import DEFAULTS, SIMULATION_DEFAULTS as CONFIG
 
 
 Position = tuple[int, int]
@@ -240,11 +241,11 @@ class Simulation:
         "north": (0, -1), "south": (0, 1), "west": (-1, 0), "east": (1, 0)
     }
 
-    def __init__(self, *, size: int = 30, agents: int = 5, seed: int = 7,
-                 predator_interval: int | None = 250,
-                 lightning_probability: float = 0.004, team: dict | None = None,
-                 resource_scale: float = 1, berry_regrowth: int = 2,
-                 max_ticks: int | None = None, starting_season: str = "spring") -> None:
+    def __init__(self, *, size: int = CONFIG["size"], agents: int = CONFIG["agents"], seed: int = CONFIG["seed"],
+                 predator_interval: int | None = CONFIG["predator_interval"],
+                 lightning_probability: float = CONFIG["lightning_probability"], team: dict | None = None,
+                 resource_scale: float = CONFIG["resource_scale"], berry_regrowth: int = CONFIG["berry_regrowth"],
+                 max_ticks: int | None = CONFIG["max_ticks"], starting_season: str = CONFIG["starting_season"]) -> None:
         if predator_interval is not None and predator_interval < 1:
             raise ValueError("predator_interval must be positive or None")
         if not 0 <= lightning_probability <= 1:
@@ -281,24 +282,24 @@ class Simulation:
         self.trace = IslandTrace(self)
         self._recorded_deaths: set[str] = set()
         self.checkpoints = InMemoryStateStore()
-        names = ("Ari", "Bo", "Cyra", "Dax", "Ena")
+        survivor_defaults = DEFAULTS["survivors"]
         self.agents: list[Survivor] = []
         land = [(x, y) for y, row in enumerate(self.world.tiles)
                 for x, tile in enumerate(row) if tile.terrain == Terrain.GRASS]
         for index in range(agents):
+            profile = survivor_defaults[index % len(survivor_defaults)]
             separated = [pos for pos in land if all(self.distance(pos, other.position) >= 7
                          for other in self.agents)]
             position = self.spawn_random.choice(separated or land)
             self.agents.append(
                 Survivor(
                     id=f"agent-{index + 1}",
-                    name=names[index % len(names)],
+                    name=profile["name"],
                     position=position,
-                    objective="Explore and survive independently",
-                    social_traits=SocialTraits(*(self.social_random.randint(5, 95) for _ in range(3))),
-                    intelligence=self.intelligence_random.randint(
-                        85 if index == 0 else 5 if index == 1 else 20,
-                        100 if index == 0 else 20 if index == 1 else 85),
+                    objective=profile["objective"],
+                    social_traits=SocialTraits(*(self.social_random.randint(*profile["personality_range"]) for _ in range(3))),
+                    intelligence=self.intelligence_random.randint(*profile["intelligence_range"]),
+                    **{**DEFAULTS["survivor_state"], **profile.get("state", {})},
                 )
             )
         if team is not None:
