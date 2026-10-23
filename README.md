@@ -55,6 +55,7 @@ competition team files continue to use the documented 1–10 attribute scale.
 - [Competition fairness and replay guarantees](agentstranded/COMPETITION_FAIRNESS.md)
 - [Headless evaluation and feature comparisons](agentstranded/EVALUATION.md)
 - [Full evaluation metric catalog](agentstranded/METRICS_CATALOG.md)
+- [Behavior-policy integration with bbagents 0.2.1](agentstranded/BEHAVIOR_POLICIES.md)
 - [Feature backlog](agentstranded/TODO.md)
 
 ## Development
@@ -64,7 +65,8 @@ pytest
 ruff check agentstranded tests
 ```
 
-The bbagents dependency is pinned to the framework revision used during extraction.
+The bbagents dependency is pinned to the exact 0.2.1 framework revision containing
+the behavior-policy API.
 To develop against a sibling framework checkout instead:
 
 ```sh

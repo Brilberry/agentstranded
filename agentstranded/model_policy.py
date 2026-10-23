@@ -17,6 +17,7 @@ from bbagents.optimization import Cache
 from .inference import InferenceGate
 from .simulation import SurvivalPolicy
 from .social import SOCIAL_TOOLS, validate_social
+from .behavior import PreparedChoice
 
 
 TASKS = {
@@ -372,7 +373,7 @@ class ModelPolicy(SurvivalPolicy):
             share = self._social_decision(agent)
             if share:
                 agent.decision_source = "social policy"
-                return share
+                return self._select_prepared(agent, PreparedChoice("model_social", share, "Local consent before model milestone"), model=True)
         if plan and not any(step.status == StepStatus.FAILED for step in plan.steps):
             for _ in range(len(plan.steps)):
                 step = plan.next_ready_step()
@@ -399,7 +400,7 @@ class ModelPolicy(SurvivalPolicy):
                 agent.decision_source = "model plan"
                 self.last_calls[agent.id] = step
                 self.status[agent.id] = f"plan: {step.title}"
-                return call
+                return self._select_prepared(agent, PreparedChoice("model_plan", call, f"Continue milestone: {step.title}"), model=True)
         return super().decide(agent)
 
     def _task_call(self, agent, step):
