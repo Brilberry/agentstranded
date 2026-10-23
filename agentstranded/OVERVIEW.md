@@ -352,9 +352,10 @@ plan used for night preparation and survival responses.
 
 ### Traces and survivor postmortems
 
-When the simulation ends naturally, postmortem generation starts automatically.
-The **Game Over** dialog shows progress and allows reopening or retrying the export.
-It generates model summaries in
+When the simulation ends naturally, model summaries are generated automatically
+in the Markdown report. HTML is created and opened only when you click the
+**Game Over** report button (Enter also works); the dialog allows reopening or
+retrying that export. It finishes model summaries in
 the background, retains the Markdown report, and creates `survival-report.html`
 beside it, opening the HTML automatically in your default browser. Without a
 model it still exports all recorded evidence. The HTML has expandable event logs

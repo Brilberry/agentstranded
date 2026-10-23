@@ -148,9 +148,12 @@ def run(*, model: str | None = None, endpoint: str = "http://localhost:11434/api
                     reason = "no survivors remain" if not any(agent.alive for agent in sim.agents) else "tick limit reached"
                     print(f"Game over at tick {sim.tick}: {reason}.", flush=True)
                     if reports:
+                        reports.update()  # Queue model summaries, not HTML export.
                         reports.save()
-                    if export:
-                        export.start()  # Natural completion, not process interruption.
+                if (reports and not reports.closed and not (export and export.busy)
+                        and all(future.done() for future in reports.futures)):
+                    reports.close()
+                    reports_closed = True
 
             screen.fill((20, 22, 25))
             for y, row in enumerate(sim.world.tiles):

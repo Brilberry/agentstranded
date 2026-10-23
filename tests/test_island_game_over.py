@@ -44,19 +44,24 @@ def test_one_remaining_survivor_keeps_the_game_running():
     assert not simulation.trace.events_named("simulation.ended")
 
 
-def test_renderer_freezes_final_state_and_saves_reports(monkeypatch, tmp_path, capsys):
+@pytest.mark.parametrize("open_report", [False, True])
+def test_renderer_freezes_final_state_and_saves_reports(monkeypatch, tmp_path, capsys, open_report):
     monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
     pygame = pytest.importorskip("pygame")
     from agentstranded import app
     from agentstranded import report_view
-    monkeypatch.setattr(report_view.webbrowser, "open", lambda url: True)
+    opened = []
+    monkeypatch.setattr(report_view.webbrowser, "open", lambda url: opened.append(url) or True)
 
     simulation = Simulation(agents=1, predator_interval=None, lightning_probability=0)
     simulation.agents[0].health, simulation.agents[0].hunger = 1, 95
     monkeypatch.setattr(app, "Simulation", lambda: simulation)
     monkeypatch.setattr(pygame.time, "Clock", lambda: SimpleNamespace(tick=lambda fps: 1000))
-    frames = iter([[], [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE),
-                        pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT)],
+    actions = [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE),
+               pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT)]
+    if open_report:
+        actions.append(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+    frames = iter([[], actions,
                    [pygame.event.Event(pygame.QUIT)]])
     monkeypatch.setattr(pygame.event, "get", lambda: next(frames))
     app.run(report_dir=str(tmp_path), postmortems=False)
@@ -64,7 +69,8 @@ def test_renderer_freezes_final_state_and_saves_reports(monkeypatch, tmp_path, c
     assert "Game over at tick 1" in capsys.readouterr().out
     assert "Died at tick 1" in (tmp_path / "survival-report.md").read_text()
     assert "simulation.ended" in (tmp_path / "survival-report.md").read_text()
-    assert (tmp_path / "survival-report.html").exists()
+    assert (tmp_path / "survival-report.html").exists() == open_report
+    assert bool(opened) == open_report
 
 
 def test_ctrl_c_does_not_start_postmortem_export(monkeypatch, tmp_path):
