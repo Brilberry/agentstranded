@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = [
-  "bbagents @ git+https://github.com/Brilberry/bbagents.git@75e5c43",
+  "bbagents @ git+https://github.com/Brilberry/bbagents.git@0aea6a022f1d3082cbea6124334bc3a5f641b601",
   "pygame-ce>=2.5,<3",
   "json5>=0.9,<1",
 ]

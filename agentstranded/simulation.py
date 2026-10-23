@@ -23,6 +23,7 @@ from .tracing import IslandTrace
 from .progression import NUTRITION
 from .social import SocialTraits, SocialWorld
 from .settings import DEFAULTS, SIMULATION_DEFAULTS as CONFIG
+from .behavior import BehaviorContext, PreparedChoice, RULE_ORDER, MODEL_ORDER, make_selector
 
 
 Position = tuple[int, int]
@@ -1401,6 +1402,19 @@ class SurvivalPolicy:
 
     def __init__(self, simulation: Simulation) -> None:
         self.sim = simulation
+        self.behavior_selectors = {}
+        self.last_selections = {}
+
+    def _select_prepared(self, agent, choice, *, model=False):
+        order = MODEL_ORDER if model else RULE_ORDER
+        key = (agent.id, model)
+        if key not in self.behavior_selectors:
+            self.behavior_selectors[key] = make_selector(self.sim, agent.id, order)
+        selection = self.behavior_selectors[key].select(BehaviorContext.from_choice(choice))
+        self.last_selections[agent.id] = selection
+        if selection.action is None:
+            raise RuntimeError(f"No behavior proposal for prepared controller {choice.policy}")
+        return selection.action
 
     def tool_objective(self, agent: Survivor) -> str | None:
         """Knowledge permits crafting; anticipated utility decides whether to invest."""
@@ -1460,6 +1474,9 @@ class SurvivalPolicy:
         return self.sim.social.choose(agent, self)
 
     def decide(self, agent: Survivor) -> ToolCall:
+        return self._select_prepared(agent, self._prepare_rule_choice(agent))
+
+    def _prepare_rule_choice(self, agent: Survivor) -> PreparedChoice:
         self.sim.observe(agent)
         self._read_messages(agent)
         self._update_objective(agent)
@@ -1467,26 +1484,26 @@ class SurvivalPolicy:
             self.replan(agent, "shelter destroyed")
         defense = self.defend(agent)
         if defense:
-            return defense
+            return PreparedChoice("defense", defense, "Immediate threat response or defensive recovery")
         emergency = self._emergency(agent)
         if not emergency and not agent.suspended_plan_key and not agent.resume_pending:
             advancement = self._homestead_action(agent)
             if advancement is not None:
                 agent.decision_source = "homestead policy"
-                return advancement
+                return PreparedChoice("homestead", advancement, "Useful home or equipment activity")
             weather = self.weather_response(agent)
             if weather is not None:
                 agent.decision_source = "weather policy"
-                return weather
+                return PreparedChoice("weather", weather, "Respond to hazardous conditions")
             garden = self._garden_action(agent)
             if garden is not None:
                 agent.decision_source = "homestead policy"
-                return garden
+                return PreparedChoice("garden", garden, "Tend or harvest home supplies")
         if not emergency and not agent.suspended_plan_key and not agent.resume_pending:
             share = self._social_decision(agent)
             if share:
                 agent.decision_source = "social policy"
-                return share
+                return PreparedChoice("social", share, "Local communication or collaboration")
         if (not emergency and not agent.suspended_plan_key and agent.home is None
                 and agent.objective.startswith("Build")
                 and agent.current_plan and agent.current_plan.goal != "Claim available shelter"
@@ -1510,7 +1527,7 @@ class SurvivalPolicy:
             if "emergency" in agent.plan_reason:
                 self.replan(agent, "resume personal objective")
             else:
-                return ToolCall("observe_surroundings")
+                return PreparedChoice("local_plan", ToolCall("observe_surroundings"), "Plan completed")
 
         for _ in range(len(agent.current_plan.steps) + 1):
             step = agent.current_plan.next_ready_step()
@@ -1522,11 +1539,11 @@ class SurvivalPolicy:
             if finished:
                 step.status = StepStatus.DONE
                 if agent.current_plan.is_complete():
-                    return ToolCall("observe_surroundings")
+                    return PreparedChoice("local_plan", ToolCall("observe_surroundings"), "Plan completed")
                 continue
             self.sim.trace.record("decision.completed", {"tick": self.sim.tick, "agent": agent.id, "reason": agent.plan_reason, "step": step.id, "tool": call.tool_name})
-            return call
-        return ToolCall("observe_surroundings")
+            return PreparedChoice("local_plan", call, agent.plan_reason or "Continue local plan")
+        return PreparedChoice("local_plan", ToolCall("observe_surroundings"), "Refresh observations")
 
     def weather_response(self, agent: Survivor) -> ToolCall | None:
         if not self.sim.conditions.hazardous or self.sim.threatening_predators(agent) or self.sim.wildlife.threats(agent):
