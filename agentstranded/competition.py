@@ -154,7 +154,7 @@ def score(sim):
 
 
 def compete(team, competition):
-    from .reproducibility import ReplayDigest, encode, initial_environment_digest
+    from .reproducibility import ReplayDigest, initial_environment_digest
     competition = validate_competition(competition)
     team = validate_team(team, competition)
     runs = []
@@ -170,6 +170,14 @@ def compete(team, competition):
             replay.record(sim)
         runs.append({"seed": seed, **score(sim), "replay_sha256": replay.finish(sim),
                      "initial_environment_sha256": environment_digest})
+    return {**engine_metadata(), "ruleset_version": competition["ruleset_version"],
+            "team": team, "competition": competition,
+            "configuration_sha256": hashlib.sha256(json.dumps({"team": team, "competition": competition}, sort_keys=True).encode()).hexdigest(),
+            "runs": runs, "mean_score": sum(run["score"] for run in runs) / len(runs)}
+
+
+def engine_metadata():
+    from .reproducibility import encode
     from importlib.metadata import version
     import bbagents
     engine_digest = hashlib.sha256()
@@ -180,14 +188,20 @@ def compete(team, competition):
             engine_digest.update(encode([label, source.relative_to(directory).as_posix(), len(content)]))
             engine_digest.update(content)
     import platform
+    import subprocess
+    revision, dirty = None, None
+    repository = Path(__file__).resolve().parents[1]
+    if (repository / ".git").exists():
+        try:
+            revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repository, timeout=2, encoding="utf-8", errors="replace").strip()
+            dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=repository, timeout=2, encoding="utf-8", errors="replace").strip())
+        except (OSError, subprocess.SubprocessError):
+            pass
     return {"engine_version": version("agentstranded"), "bbagents_version": version("bbagents"),
+            "source_git_revision": revision, "source_worktree_dirty": dirty,
             "runtime": {"python": platform.python_version(), "implementation": platform.python_implementation(),
                         "platform": platform.platform()},
-            "replay_format": "gameplay-state-v2", "ruleset_version": competition["ruleset_version"],
-            "engine_sha256": engine_digest.hexdigest(),
-            "team": team, "competition": competition,
-            "configuration_sha256": hashlib.sha256(json.dumps({"team": team, "competition": competition}, sort_keys=True).encode()).hexdigest(),
-            "runs": runs, "mean_score": sum(run["score"] for run in runs) / len(runs)}
+            "replay_format": "gameplay-state-v2", "engine_sha256": engine_digest.hexdigest()}
 
 
 def main():

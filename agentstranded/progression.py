@@ -86,6 +86,8 @@ def missing_prerequisites(agent, skill):
 
 
 def ready(sim, agent, identity):
+    if identity == "net_fishing" and not sim.features["fishing_nets"]:
+        return False
     rule = RULES[identity]
     if (not agent.alive or identity in agent.learned_skills or missing_prerequisites(agent, identity)
             or sim.tick - agent.born_tick < rule.age(agent.intelligence)

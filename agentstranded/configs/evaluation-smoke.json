@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "team": "team.json5",
+  "competition": "competition.json",
+  "seeds": [17, 42],
+  "max_ticks": 1600,
+  "stall_ticks": 20,
+  "variants": [
+    {"name": "baseline", "overrides": {}},
+    {"name": "no-nets", "overrides": {"features": {"fishing_nets": false}}},
+    {"name": "no-alligators", "overrides": {"features": {"alligators": false}}}
+  ]
+}

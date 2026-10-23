@@ -208,6 +208,18 @@ or rain-based collection can be considered later with **10**, not assumed in v1.
 Depends on existing hunting and skill progression. Cold-protection effects require
 **10–11**; skinning and garment crafting can be implemented before those systems.
 
+## 15. Evaluation harness — V1 DONE; extended metrics backlog remains
+
+- [x] Persist the full metric catalog in METRICS_CATALOG.md.
+- [x] Headless paired-seed baseline/candidate runs with isolated bbagents trials.
+- [x] Streaming survival, food provenance/consumption, water, learning, stalls and performance metrics.
+- [x] JSON results, standalone HTML comparisons and optional compressed event evidence.
+- [x] Feature-off ablations remove both mechanics and policy incentives.
+- [ ] Controlled scenarios, full opportunity/eligibility funnels and calibrated balance targets.
+- [ ] Extended metrics and statistical analyses from METRICS_CATALOG.md.
+
+See [Evaluation guide](EVALUATION.md). Execution-integrity checks are not balance verdicts.
+
 ## Cross-cutting requirements for each feature
 
 - [ ] Keep mechanics configurable and document new JSON5 options, prerequisites,

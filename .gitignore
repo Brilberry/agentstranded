@@ -8,3 +8,4 @@ build/
 dist/
 *.py[cod]
 survival-runs/
+evaluation-runs/

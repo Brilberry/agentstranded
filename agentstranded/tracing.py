@@ -25,6 +25,7 @@ class IslandTrace(InMemoryTrace):
         self.directory = None
         self.handles = OrderedDict()
         self.closed = False
+        self.listeners = []
 
     def record(self, event, payload=None):
         with self.lock:
@@ -34,6 +35,10 @@ class IslandTrace(InMemoryTrace):
             else:
                 payload = {**metadata, **(payload or {})}
             super().record(event, payload)
+            if self.listeners:
+                row = row_for(self.events[-1])
+                for listener in tuple(self.listeners):
+                    listener(row)
             if self.directory:
                 self._write(self.events[-1])
                 cutoff = self.simulation.tick - 199

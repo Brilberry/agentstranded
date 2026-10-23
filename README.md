@@ -53,6 +53,8 @@ competition team files continue to use the documented 1–10 attribute scale.
 - [Live commentary proposal (not implemented)](agentstranded/LIVE_COMMENTARY_PLAN.md)
 - [Team JSON5, competitions, and scoring](agentstranded/CONFIGURATION.md)
 - [Competition fairness and replay guarantees](agentstranded/COMPETITION_FAIRNESS.md)
+- [Headless evaluation and feature comparisons](agentstranded/EVALUATION.md)
+- [Full evaluation metric catalog](agentstranded/METRICS_CATALOG.md)
 - [Feature backlog](agentstranded/TODO.md)
 
 ## Development

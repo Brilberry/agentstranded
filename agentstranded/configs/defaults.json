@@ -4,6 +4,7 @@
     "lightning_probability": 0.004, "resource_scale": 1,
     "berry_regrowth": 2, "max_ticks": null, "starting_season": "spring"
   },
+  "features": {"fishing_nets": true, "alligators": true},
   "lakes": {
     "net_capacity": 3, "net_interval": 20,
     "alligator_probability": 0.002, "alligator_damage": 55, "alligator_cooldown": 12

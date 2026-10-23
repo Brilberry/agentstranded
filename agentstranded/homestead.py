@@ -241,7 +241,9 @@ class Homestead:
         if reservoir.water < 1 or actor.thirst <= 0:
             raise ValueError("reservoir is empty or survivor is not thirsty")
         reservoir.water -= 1
+        before = actor.thirst
         actor.thirst = max(0, actor.thirst - 50)
+        self.sim.trace.record("water.consumed", {"agent": actor.id, "source": "reservoir", "relief": before - actor.thirst})
         self.record(actor, "reservoir.drank", water=reservoir.water, thirst=actor.thirst)
         return Observation("drink_reservoir", "drank stored shelter water", {"water": reservoir.water, "thirst": actor.thirst})
 

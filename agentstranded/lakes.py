@@ -40,6 +40,8 @@ class Lakes:
                      if self.sim.world.tile(pos).terrain.value == "lake" and pos not in self.nets), None)
 
     def place(self, actor):
+        if not self.sim.features["fishing_nets"]:
+            raise ValueError("net fishing is disabled")
         if "net_fishing" not in actor.learned_skills:
             raise ValueError("net_fishing skill required")
         site = self.site(actor)
@@ -51,6 +53,8 @@ class Lakes:
         return Observation("place_net", "placed a woven wooden-strip fishing net", {"position": site})
 
     def collect(self, actor, retrieve=False):
+        if not self.sim.features["fishing_nets"]:
+            raise ValueError("net fishing is disabled")
         net = next((net for _, net in sorted(self.nets.items())
                     if self.accessible(actor, net) and (retrieve or net.catch)), None)
         if net is None:
@@ -67,7 +71,7 @@ class Lakes:
         return Observation("retrieve_net" if retrieve else "collect_net", f"collected {amount} fish", {"fish": amount})
 
     def available(self, actor):
-        if not actor.alive or actor.sleep_remaining:
+        if not self.sim.features["fishing_nets"] or not actor.alive or actor.sleep_remaining:
             return []
         calls = []
         if ("net_fishing" in actor.learned_skills and actor.inventory["fishing_net"]
@@ -89,11 +93,12 @@ class Lakes:
                 if net.owner == actor.id or net.position in actor.known_tiles]
 
     def encounter(self, actor):
-        if (not actor.alive or self.sim.world.tile(actor.position).terrain.value != "lake"
+        if (not self.sim.features["alligators"] or not actor.alive or self.sim.world.tile(actor.position).terrain.value != "lake"
                 or self.sim.world.tile(actor.position).shelter_owner is not None
                 or self.sim.tick < actor.next_alligator_tick or actor.last_alligator_check == self.sim.tick):
             return
         actor.last_alligator_check = self.sim.tick
+        self.sim.trace.record("lake.hazard_checked", {"agent": actor.id, "position": actor.position})
         if self.hazard_random[actor.id].random() >= self.rules["alligator_probability"]:
             return
         # The first encounter is survivable even for an already injured survivor.
@@ -114,6 +119,8 @@ class Lakes:
             actor.death_tick = self.sim.tick
 
     def update(self):
+        if not self.sim.features["fishing_nets"]:
+            return
         for pos, net in sorted(self.nets.items()):
             age = self.sim.tick - net.placed_tick
             tile = self.sim.world.tile(pos)

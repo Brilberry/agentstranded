@@ -249,7 +249,11 @@ class Simulation:
                  predator_interval: int | None = CONFIG["predator_interval"],
                  lightning_probability: float = CONFIG["lightning_probability"], team: dict | None = None,
                  resource_scale: float = CONFIG["resource_scale"], berry_regrowth: int = CONFIG["berry_regrowth"],
-                 max_ticks: int | None = CONFIG["max_ticks"], starting_season: str = CONFIG["starting_season"]) -> None:
+                 max_ticks: int | None = CONFIG["max_ticks"], starting_season: str = CONFIG["starting_season"],
+                 features: dict | None = None) -> None:
+        self.features = {**DEFAULTS["features"], **(features or {})}
+        if set(self.features) != {"fishing_nets", "alligators"} or any(type(value) is not bool for value in self.features.values()):
+            raise ValueError("features supports boolean fishing_nets and alligators only")
         if predator_interval is not None and predator_interval < 1:
             raise ValueError("predator_interval must be positive or None")
         if not 0 <= lightning_probability <= 1:
@@ -461,7 +465,7 @@ class Simulation:
                     )
                     if active_step is not None:
                         active_step.evidence.append(result.content)
-                self.trace.record("tool.finished", {"tick": self.tick, "agent": agent.id, "tool_name": call.tool_name, "status": "completed", "result": result.content})
+                self.trace.record("tool.finished", {"tick": self.tick, "agent": agent.id, "tool_name": call.tool_name, "status": "completed", "result": result.content, "result_metadata": dict(result.metadata)})
             except (ValueError, KeyError) as exc:
                 if hasattr(self.policy, "on_result"):
                     self.policy.on_result(agent, call, error=exc)
@@ -503,6 +507,7 @@ class Simulation:
                 "energy": agent.energy, "position": agent.position, "inventory": dict(agent.inventory),
                 "home": agent.home, "sleep_remaining": agent.sleep_remaining,
                 "in_shelter": int(self.world.tile(agent.position).shelter_owner is not None),
+                "in_lake": int(self.world.tile(agent.position).terrain == Terrain.LAKE),
                 "alligator_attacks": agent.alligator_attacks,
                 "alive": agent.alive, "last_action": agent.last_action,
                 "plan_goal": active_plan.goal if active_plan else None,
@@ -922,6 +927,7 @@ class Simulation:
                     continue
                 damage = 30 if predator.kind == "bear" else 7
                 predator.next_attack_tick = self.tick + (6 if predator.kind == "bear" else 4)
+                health_before = target.health
                 target.health = max(0, target.health - damage)
                 target.alive = target.health > 0
                 if not target.alive:
@@ -936,6 +942,7 @@ class Simulation:
                 self.event_log.appendleft(f"Tick {self.tick}: {predator.kind} attacked {target.name}")
                 self.trace.record("predator.attacked", {"tick": self.tick, "agent": target.id,
                                                         "predator": predator.id, "damage": damage,
+                                                        "kind": predator.kind, "hp_lost": health_before - target.health,
                                                         "pack_id": predator.pack_id,
                                                         "hunger": predator.hunger, "thirst": predator.thirst})
                 continue
@@ -1008,7 +1015,7 @@ class Simulation:
         recovery = (f"; recovered {reward['hunger_recovered']:g} hunger and "
                     f"{reward['thirst_recovered']:g} thirst" if reward else "")
         return Observation("attack", f"{outcome} {predator.kind}{recovery}",
-                           {"predator_id": predator.id, **reward})
+                           {"predator_id": predator.id, "equipment": "spear" if agent.inventory["spear"] else "axe" if agent.inventory["axe"] else "hands", **reward})
 
     def rest(self, agent: Survivor) -> Observation:
         threatened = bool(self.threatening_predators(agent) or self.wildlife.threats(agent))
@@ -1085,7 +1092,7 @@ class Simulation:
         for position in self.world.positions_within(agent.position, agent.visibility):
             tile = self.world.tile(position)
             agent.known_tiles[position] = tile.terrain
-            if tile.terrain == Terrain.LAKE and not agent.knows_lake_risk:
+            if tile.terrain == Terrain.LAKE and self.features["alligators"] and not agent.knows_lake_risk:
                 agent.knows_lake_risk = True
                 agent.memory.remember(MemoryRecord("Lake crossings carry a rare risk of serious alligator attacks; shore fishing is safe.",
                     source="observed-lake", metadata={"tick": self.tick, "position": position}))
@@ -1218,9 +1225,12 @@ class Simulation:
         if resource == "wood":
             agent.wood_gathered += amount
         agent.energy = max(0.0, agent.energy - 2.0)
-        return Observation("gather", f"gathered {amount} {resource}", {"resource": resource, "amount": amount, "position": source})
+        return Observation("gather", f"gathered {amount} {resource}", {"resource": resource, "amount": amount, "position": source,
+            "equipment": "axe" if resource == "wood" and agent.inventory["axe"] else "hands"})
 
     def craft(self, agent: Survivor, item: str) -> Observation:
+        if item == "fishing_net" and not self.features["fishing_nets"]:
+            raise ValueError("net fishing is disabled")
         from .progression import RECIPES
         if item not in RECIPES:
             raise ValueError(f"unknown recipe: {item}")
@@ -1249,11 +1259,17 @@ class Simulation:
         nutrition = NUTRITION
         if item not in nutrition or agent.inventory[item] <= 0:
             raise ValueError(f"no edible {item}")
+        before = agent.hunger
         agent.inventory[item] -= 1
         agent.hunger = max(0.0, agent.hunger - nutrition[item])
+        self.trace.record("food.consumed", {"agent": agent.id, "item": item, "amount": 1,
+            "nutrition": nutrition[item], "hunger_before": before, "hunger_after": agent.hunger,
+            "effective_nutrition": before - agent.hunger})
         return Observation("eat", f"ate {item}", {"hunger": agent.hunger})
 
     def learn_skill(self, agent: Survivor, skill: str, source: str) -> None:
+        if skill == "net_fishing" and not self.features["fishing_nets"]:
+            raise ValueError("net fishing is disabled")
         from .progression import RULES, IslandSkills, missing_prerequisites
         if skill not in RULES or skill in agent.learned_skills:
             return
@@ -1304,7 +1320,10 @@ class Simulation:
         water = next((pos for pos in adjacent if self.world.tile(pos).terrain.is_water), None)
         if water is None:
             raise ValueError("no water within reach")
+        before = agent.thirst
         agent.thirst = max(0.0, agent.thirst - 75.0)
+        self.trace.record("water.consumed", {"agent": agent.id, "source": self.world.tile(water).terrain.value,
+            "relief": before - agent.thirst})
         return Observation("drink", f"drank from {self.world.tile(water).terrain.value}", {"thirst": agent.thirst})
 
     def communicate(self, sender: Survivor, agent_id: str, message: str) -> Observation:
@@ -2034,6 +2053,8 @@ class SurvivalPolicy:
         return ToolCall("hunt", {"animal_id": target.id})
 
     def _net_action(self, agent: Survivor) -> ToolCall | None:
+        if not self.sim.features["fishing_nets"]:
+            return None
         deployed = self.sim.lakes.owned(agent)
         if deployed:
             distance = self.sim.distance(agent.position, deployed.position)
@@ -2059,7 +2080,7 @@ class SurvivalPolicy:
         return ToolCall("move", {"direction": self._direction_for(agent, target)})
 
     def _fishing_food(self, agent: Survivor) -> ToolCall | None:
-        net = self.sim.lakes.owned(agent)
+        net = self.sim.lakes.owned(agent) if self.sim.features["fishing_nets"] else None
         if net and net.catch:
             if self.sim.distance(agent.position, net.position) <= 1 and agent.energy >= 2:
                 return ToolCall("collect_net")
@@ -2121,7 +2142,7 @@ class SurvivalPolicy:
         return ToolCall("move", {"direction": self.sim.random.choice(directions)})
 
     def _direction_for(self, agent: Survivor, target: Position) -> str:
-        if not agent.knows_lake_risk or agent.social_traits.caution < 70:
+        if not self.sim.features["alligators"] or not agent.knows_lake_risk or agent.social_traits.caution < 70:
             return self._direction_toward(agent.position, target)
         import heapq
         queue = [(0, agent.position, "")]
