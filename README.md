@@ -50,6 +50,7 @@ competition team files continue to use the documented 1–10 attribute scale.
 - [Game mechanics](agentstranded/README.md)
 - [Skills, recipes, and survival systems](agentstranded/SURVIVAL_SYSTEMS.md)
 - [Team JSON5, competitions, and scoring](agentstranded/CONFIGURATION.md)
+- [Competition fairness and replay guarantees](agentstranded/COMPETITION_FAIRNESS.md)
 - [Feature backlog](agentstranded/TODO.md)
 
 ## Development

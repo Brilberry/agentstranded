@@ -197,7 +197,7 @@ class SocialWorld:
         else:
             resource = "berries" if topic == "food" else "wood"
             positions = actor.known_resources.get(resource, set())
-            position = min(positions, key=lambda pos: self.sim.distance(actor.position, pos), default=None)
+            position = min(positions, key=lambda pos: (self.sim.distance(actor.position, pos), pos), default=None)
         if position is None or position not in actor.known_tiles:
             raise ValueError("survivor does not know this information")
         return {"topic": topic, "position": list(position), "terrain": actor.known_tiles[position].value}
@@ -241,7 +241,7 @@ class SocialWorld:
         if kind == "information" and set(payload) == {"kind", "topic"}:
             return {"kind": kind, "information": self.information(actor, payload["topic"])}
         if kind == "status" and set(payload) == {"kind"}:
-            return {"kind": kind, "inventory": {key: actor.inventory[key] for key in ITEMS},
+            return {"kind": kind, "inventory": {key: actor.inventory[key] for key in sorted(ITEMS)},
                     "hunger": actor.hunger, "thirst": actor.thirst, "needs_home": actor.home is None}
         if kind == "decline" and set(payload) == {"kind", "topic"} and payload["topic"] in TOPICS:
             return deepcopy(payload)
@@ -506,7 +506,7 @@ class SocialWorld:
         return Observation("use_water", "drank stored water", {"thirst": actor.thirst})
 
     def refresh(self):
-        for identity in list(self.active_offers):
+        for identity in sorted(self.active_offers):
             snapshot = self.offers.load(identity)
             value = snapshot.value
             if value["status"] != "pending":

@@ -1831,7 +1831,7 @@ class SurvivalPolicy:
         agent.known_resources[resource] = positions
         if not positions:
             return self._explore(agent), False
-        target = min(positions, key=lambda pos: self.sim.distance(agent.position, pos))
+        target = min(positions, key=lambda pos: (self.sim.distance(agent.position, pos), pos))
         if agent.position == target or (resource == "stone" and self.sim.distance(agent.position, target) <= 1):
             return ToolCall("gather", {"resource": resource}), False
         return ToolCall("move", {"direction": self._direction_toward(agent.position, target)}), False
@@ -2039,7 +2039,7 @@ class SurvivalPolicy:
 
     def _nearest_resource(self, agent: Survivor, resource: str) -> Position | None:
         positions = [pos for pos in agent.known_resources.get(resource, set()) if self.sim.world.tile(pos).resources[resource] > 0]
-        return min(positions, key=lambda pos: self.sim.distance(agent.position, pos), default=None)
+        return min(positions, key=lambda pos: (self.sim.distance(agent.position, pos), pos), default=None)
 
     def nearest_known_terrain(self, agent: Survivor, terrain: Terrain) -> Position | None:
         positions = [pos for pos, known in agent.known_tiles.items() if known == terrain]

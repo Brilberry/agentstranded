@@ -187,7 +187,10 @@ competition score = arithmetic mean of seed scores
 Lifetimes are capped at the match limit. The multiplier stays five even when a
 custom competition chooses a different team size; compare entries only within
 the same competition settings. Results contain normalized team/settings, engine
-and ruleset versions, engine source hash, configuration hash, and per-seed lifetime/score breakdowns.
+and ruleset versions, engine source hash, configuration hash, runtime information,
+per-seed gameplay fingerprints, and lifetime/score breakdowns. See
+[Competition fairness](COMPETITION_FAIRNESS.md) for the reproducibility contract,
+fixed action order, shared environmental conditions, and organizer responsibilities.
 Engine IDs (`agent-1`, etc.) map to the submission survivors in array order.
 The runner caps recent trace events at 30,000; the interactive viewer retains its
 normal journal/report workflow. This is a local evaluation runner, not an upload

@@ -154,6 +154,7 @@ def score(sim):
 
 
 def compete(team, competition):
+    from .reproducibility import ReplayDigest, encode, initial_environment_digest
     competition = validate_competition(competition)
     team = validate_team(team, competition)
     runs = []
@@ -161,18 +162,28 @@ def compete(team, competition):
         sim = create_simulation(team, competition, seed)
         from collections import deque
         sim.trace.events = deque(sim.trace.events, maxlen=30000)
+        replay = ReplayDigest()
+        environment_digest = initial_environment_digest(sim)
+        replay.record(sim)
         while not sim.game_over:
             sim.step()
-        runs.append({"seed": seed, **score(sim)})
+            replay.record(sim)
+        runs.append({"seed": seed, **score(sim), "replay_sha256": replay.finish(sim),
+                     "initial_environment_sha256": environment_digest})
     from importlib.metadata import version
     import bbagents
     engine_digest = hashlib.sha256()
-    for directory in (Path(__file__).parent, Path(bbagents.__file__).parent):
+    for label, directory in (("game", Path(__file__).parent), ("framework", Path(bbagents.__file__).parent)):
         for source in sorted(path for path in directory.rglob("*")
                              if path.suffix in {".py", ".json", ".json5"}):
-            engine_digest.update(str(source.relative_to(directory)).encode())
-            engine_digest.update(source.read_bytes())
-    return {"engine_version": version("bbagents"), "ruleset_version": competition["ruleset_version"],
+            content = source.read_bytes()
+            engine_digest.update(encode([label, source.relative_to(directory).as_posix(), len(content)]))
+            engine_digest.update(content)
+    import platform
+    return {"engine_version": version("agentstranded"), "bbagents_version": version("bbagents"),
+            "runtime": {"python": platform.python_version(), "implementation": platform.python_implementation(),
+                        "platform": platform.platform()},
+            "replay_format": "gameplay-state-v1", "ruleset_version": competition["ruleset_version"],
             "engine_sha256": engine_digest.hexdigest(),
             "team": team, "competition": competition,
             "configuration_sha256": hashlib.sha256(json.dumps({"team": team, "competition": competition}, sort_keys=True).encode()).hexdigest(),
