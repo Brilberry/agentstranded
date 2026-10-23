@@ -220,9 +220,11 @@ def test_lightning_destroys_shelter_and_interrupts_sleep():
 
 
 def test_random_lightning_is_seeded_and_can_be_disabled():
+    from agentstranded.climate import Conditions
     results = []
     for _ in range(2):
         simulation = Simulation(seed=8, predator_interval=None, lightning_probability=0.05)
+        simulation.climate.at = lambda *args: Conditions("spring", "rainy", 20)
         for _ in range(100):
             simulation.step()
         events = simulation.trace.events_named("calamity.lightning")
