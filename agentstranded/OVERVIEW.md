@@ -295,8 +295,11 @@ owner died, or an older shelter its owner no longer calls home. It costs no wood
 an actively owned home cannot be taken. Builders reuse their existing home rather
 than building a new shelter after each interruption.
 
-**Lightning** has a 0.4% base chance each tick, multiplied by 1 in normal rain,
-3 in thunderstorms and 0.25 otherwise. Every tile has the same chance of being targeted, regardless
+**Lightning** occurs only while it is raining: 0.4% chance each tick in normal
+rain, or 1.2% during rainy thunderstorms. Sunny and snowy weather never produce
+lightning. Rainy-day probabilities vary by season: spring 25%, summer 20%, autumn
+40%, and winter 25% (with a separate 20% chance of snow in winter).
+Every tile has the same chance of being targeted, regardless
 of shelters or terrain (1/900 per strike on a 30×30 map). A struck shelter is destroyed, its home assignment
 is cleared, and sleepers on that tile wake immediately. Lightning does not directly
 damage health. A yellow bolt briefly marks the strike, and observations and traces

@@ -400,8 +400,9 @@ class Simulation:
             self.event_log.appendleft(f"{conditions.season.title()}: {conditions.weather}, {conditions.temperature:g}°C")
         self.social.refresh()
         self.homestead.update()
-        lightning_factor = 3 if self.conditions.thunderstorm else 1 if self.conditions.weather == "rainy" else 0.25
-        if self.weather_random.random() < min(1, self.lightning_probability * lightning_factor):
+        lightning_factor = 3 if self.conditions.thunderstorm else 1
+        if (self.conditions.weather == "rainy"
+                and self.weather_random.random() < min(1, self.lightning_probability * lightning_factor)):
             self.lightning_strike()
         if self.predator_interval and self.tick % self.predator_interval == 0:
             self._spawn_predator()

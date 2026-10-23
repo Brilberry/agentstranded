@@ -1,7 +1,35 @@
 import random
 from unittest.mock import Mock
 
+import pytest
+
 from agentstranded import Simulation
+from agentstranded.climate import Climate, Conditions, SEASONS, SEASON_DAYS
+
+
+@pytest.mark.parametrize("weather,storm,expected", [
+    ("sunny", False, 0), ("snowy", False, 0),
+    ("sunny", True, 0), ("rainy", False, 1), ("rainy", True, 1),
+])
+def test_scheduled_lightning_requires_rain(weather, storm, expected):
+    sim = Simulation(agents=1, predator_interval=None, lightning_probability=1)
+    sim.climate.at = lambda *args: Conditions("spring", weather, 20, thunderstorm=storm)
+    sim.weather_random.random = lambda: 0
+    sim.step()
+    assert len(sim.trace.events_named("calamity.lightning")) == expected
+
+
+def test_rain_frequency_varies_by_season_and_remains_seeded():
+    rainy = {}
+    for season in SEASONS:
+        rainy[season] = sum(Climate(seed, season).at(0, 80).weather == "rainy"
+                            for seed in range(2000)) / 2000
+        assert rainy[season] == sum(Climate(seed, season).at(0, 80).weather == "rainy"
+                                    for seed in range(2000)) / 2000
+    for season, probability in {"spring": .25, "summer": .20, "autumn": .40, "winter": .25}.items():
+        assert rainy[season] == pytest.approx(probability, abs=.04)
+    assert rainy["autumn"] > rainy["spring"] > rainy["summer"]
+    assert sum(SEASON_DAYS.values()) == 365
 
 
 def test_shelters_do_not_change_random_strike_locations():

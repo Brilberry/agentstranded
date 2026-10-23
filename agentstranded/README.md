@@ -29,7 +29,8 @@ the current season, weather, and temperature.
 
 Rain cools the air by 3°C. Rainy days can be thunderstorms (40% of summer rain,
 10% in other seasons). The lightning setting is a base probability: normal rain
-uses 1×, thunderstorms 3×, and other weather 0.25×. Targets remain uniform across
+uses 1× and rainy thunderstorms 3×. Lightning never occurs in sunny or snowy
+weather. Targets remain uniform across
 the map. Climate schedules are seeded separately from survivor choices and other
 environmental random streams; all competitors receive the same conditions.
 
