@@ -7,7 +7,7 @@ from agentstranded.settings import CONFIG_DIRECTORY, DEFAULTS, SIMULATION_DEFAUL
 
 
 def test_normal_simulation_reads_packaged_defaults():
-    data = json.loads((CONFIG_DIRECTORY / "defaults.json").read_text())
+    data = json.loads((CONFIG_DIRECTORY / "defaults.json").read_text(encoding="utf-8"))
     sim = Simulation()
     assert sim.world.size == data["simulation"]["size"]
     assert len(sim.agents) == data["simulation"]["agents"]

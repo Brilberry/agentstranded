@@ -138,7 +138,7 @@ def test_policies_and_attributes_are_applied():
 def test_duplicate_keys_are_rejected(tmp_path):
     for json5, suffix in ((True, "json5"), (False, "json")):
         path = tmp_path / f"bad.{suffix}"
-        path.write_text('{"name": 1, "name": 2}')
+        path.write_text('{"name": 1, "name": 2}', encoding="utf-8")
         with pytest.raises(ValueError):
             load(path, json5=json5)
 

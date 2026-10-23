@@ -29,14 +29,14 @@ Recorded cause: starvation.
 ```jsonl
 {"message":"<img src=x onerror=alert(1)>"}
 ```
-''')
-    original = source.read_text()
+''', encoding="utf-8")
+    original = source.read_text(encoding="utf-8")
     target = render_html(source)
-    html = target.read_text()
+    html = target.read_text(encoding="utf-8")
     assert "<title>Agent Stranded — Postmortem</title>" in html
     assert "Agent Stranded report" in html
     assert "Survival Island" not in html
-    assert source.read_text() == original
+    assert source.read_text(encoding="utf-8") == original
     assert '<a href="#agent-1">Ari</a>' in html
     assert '<a id="agent-1"></a>' in html
     assert "<script>" not in html and "<img " not in html
@@ -71,8 +71,8 @@ def test_export_waits_off_thread_for_model_and_opens_browser_once(tmp_path):
         export.poll()
         assert len(opened) == 1
         assert opened[0] == (tmp_path / "survival-report.html").as_uri()
-        assert "Starvation explained." in (tmp_path / "survival-report.md").read_text()
-        assert "Starvation explained." in (tmp_path / "survival-report.html").read_text()
+        assert "Starvation explained." in (tmp_path / "survival-report.md").read_text(encoding="utf-8")
+        assert "Starvation explained." in (tmp_path / "survival-report.html").read_text(encoding="utf-8")
         assert manager.closed
     finally:
         release.set()

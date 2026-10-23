@@ -308,7 +308,7 @@ def test_completed_upgrades_appear_in_single_markdown_report(tmp_path):
     sim.homestead.execute(actor, "install_reservoir")
     sim.homestead.execute(actor, "fill_reservoir")
     write_reports(sim, tmp_path)
-    report = (tmp_path / "survival-report.md").read_text()
+    report = (tmp_path / "survival-report.md").read_text(encoding="utf-8")
     assert "home_reservoir" in report and '"water": 1' in report
     assert "reservoir.installed" in report and "reservoir.filled" in report
 

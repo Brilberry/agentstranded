@@ -11,7 +11,7 @@ def test_no_model_report_explicitly_says_disabled(tmp_path):
     sim.agents[0].health, sim.agents[0].hunger = 1, 95
     sim.step()
     manager.close()
-    report = (tmp_path / "survival-report.md").read_text()
+    report = (tmp_path / "survival-report.md").read_text(encoding="utf-8")
     assert "Model analysis status: disabled" in report
     assert "no model summary will be generated" in report
     assert "If model analysis was enabled" not in report
@@ -27,7 +27,7 @@ def test_background_worker_failure_is_not_left_pending(monkeypatch, tmp_path):
     sim.agents[0].health, sim.agents[0].hunger = 1, 95
     sim.step()
     manager.close()
-    report = (tmp_path / "survival-report.md").read_text()
+    report = (tmp_path / "survival-report.md").read_text(encoding="utf-8")
     assert "Analysis failed: summary preparation failed" in report
     assert "Model analysis status: pending" not in report
 
@@ -48,11 +48,11 @@ def test_pending_analysis_is_replaced_with_completed_summary(tmp_path):
         manager.update()
         assert entered.wait(5)
         manager.save()
-        assert "Model analysis status: pending" in (tmp_path / "survival-report.md").read_text()
+        assert "Model analysis status: pending" in (tmp_path / "survival-report.md").read_text(encoding="utf-8")
     finally:
         release.set()
         manager.close()
-    report = (tmp_path / "survival-report.md").read_text()
+    report = (tmp_path / "survival-report.md").read_text(encoding="utf-8")
     assert "Evidence based summary." in report
     assert "Model analysis status: pending" not in report
 
@@ -67,7 +67,7 @@ def test_interrupted_run_saves_evidence_without_requesting_postmortems(tmp_path)
     assert not manager.futures and not manager.submitted
     manager.close(generate=False)
     assert not manager.futures
-    assert "Died at tick" in (tmp_path / "survival-report.md").read_text()
+    assert "Died at tick" in (tmp_path / "survival-report.md").read_text(encoding="utf-8")
 
 
 def test_deferred_analysis_replaces_alive_placeholder_at_completion(tmp_path):
@@ -80,7 +80,7 @@ def test_deferred_analysis_replaces_alive_placeholder_at_completion(tmp_path):
     sim.step()
     manager.update(generate=False)
     manager.close()
-    report = (tmp_path / "survival-report.md").read_text()
+    report = (tmp_path / "survival-report.md").read_text(encoding="utf-8")
     assert "Death explained." in report
     assert "this survivor is alive at this save" not in report
 
@@ -148,14 +148,14 @@ def test_reports_save_per_survivor_logs_and_model_postmortem(tmp_path):
     manager.update()  # No duplicate analysis submissions.
     manager.close()
     assert len(requests) == 1
-    assert "starvation" in (tmp_path / "survival-report.md").read_text()
-    report = (tmp_path / "survival-report.md").read_text()
+    assert "starvation" in (tmp_path / "survival-report.md").read_text(encoding="utf-8")
+    report = (tmp_path / "survival-report.md").read_text(encoding="utf-8")
     assert "Ari died from starvation" in report
     assert "### Final 200 ticks" in report
     assert report.count("## Model postmortem:") == 1
     assert not list(tmp_path.glob("*.summary.md"))
     manager.save()  # Repeated exports retain the completed analysis and timeline.
-    assert (tmp_path / "survival-report.md").read_text() == report
+    assert (tmp_path / "survival-report.md").read_text(encoding="utf-8") == report
     assert list(tmp_path.iterdir()) == [tmp_path / "survival-report.md"]
     history = report.split("## Complete event history\n", 1)[1].split("```jsonl\n", 1)[1].split("```", 1)[0]
     rows = [json.loads(line) for line in history.splitlines()]
@@ -173,7 +173,7 @@ def test_invalid_model_evidence_does_not_replace_raw_reports(tmp_path):
         "summary": "Unsupported claim", "likely_contributors": [], "uncertainties": [],
         "evidence_ticks": [999999]})
     manager.close()
-    report = (tmp_path / "survival-report.md").read_text()
+    report = (tmp_path / "survival-report.md").read_text(encoding="utf-8")
     assert "unavailable" in report
     assert "### Final 200 ticks" in report
     assert not list(tmp_path.glob("*.summary.md"))
@@ -186,7 +186,7 @@ def test_no_model_still_produces_inspectable_histories(tmp_path):
     simulation.step()
     manager = ReportManager(simulation, directory=tmp_path)
     manager.close()
-    report = (tmp_path / "survival-report.md").read_text()
+    report = (tmp_path / "survival-report.md").read_text(encoding="utf-8")
     assert "## Complete event history" in report
     assert "agent-5" in report
     assert len(list(tmp_path.iterdir())) == 1
@@ -206,9 +206,9 @@ def test_multiple_postmortems_stay_in_their_own_sections(tmp_path):
 
     manager = ReportManager(simulation, directory=tmp_path, model="fake", requester=requester)
     manager.close()
-    report = (tmp_path / "survival-report.md").read_text()
+    report = (tmp_path / "survival-report.md").read_text(encoding="utf-8")
     manager.save()
-    assert (tmp_path / "survival-report.md").read_text() == report
+    assert (tmp_path / "survival-report.md").read_text(encoding="utf-8") == report
     for agent in simulation.agents:
         section = report.split(f"<!-- model-postmortem:{agent.id} -->", 1)[1].split(
             f"<!-- /model-postmortem:{agent.id} -->", 1)[0]
@@ -220,9 +220,9 @@ def test_reusing_directory_preserves_old_report(tmp_path):
     simulation = Simulation(agents=1, predator_interval=None)
     first = ReportManager(simulation, directory=tmp_path)
     first.close()
-    original = (tmp_path / "survival-report.md").read_text()
+    original = (tmp_path / "survival-report.md").read_text(encoding="utf-8")
     second = ReportManager(Simulation(agents=1, predator_interval=None), directory=tmp_path)
     second.close()
     assert second.directory != tmp_path
-    assert (tmp_path / "survival-report.md").read_text() == original
+    assert (tmp_path / "survival-report.md").read_text(encoding="utf-8") == original
     assert (second.directory / "survival-report.md").exists()

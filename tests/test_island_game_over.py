@@ -67,8 +67,8 @@ def test_renderer_freezes_final_state_and_saves_reports(monkeypatch, tmp_path, c
     app.run(report_dir=str(tmp_path), postmortems=False)
     assert simulation.tick == simulation.ended_tick == 1
     assert "Game over at tick 1" in capsys.readouterr().out
-    assert "Died at tick 1" in (tmp_path / "survival-report.md").read_text()
-    assert "simulation.ended" in (tmp_path / "survival-report.md").read_text()
+    assert "Died at tick 1" in (tmp_path / "survival-report.md").read_text(encoding="utf-8")
+    assert "simulation.ended" in (tmp_path / "survival-report.md").read_text(encoding="utf-8")
     assert (tmp_path / "survival-report.html").exists() == open_report
     assert bool(opened) == open_report
 

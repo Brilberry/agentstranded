@@ -114,7 +114,7 @@ def load(path, *, json5=False):
     source = Path(path)
     if source.stat().st_size > 65536:
         raise ValueError("configuration exceeds 64 KiB")
-    text = source.read_text()
+    text = source.read_text(encoding="utf-8")
     if json5:
         try:
             import json5 as parser
