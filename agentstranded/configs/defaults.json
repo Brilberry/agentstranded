@@ -4,6 +4,10 @@
     "lightning_probability": 0.004, "resource_scale": 1,
     "berry_regrowth": 2, "max_ticks": null, "starting_season": "spring"
   },
+  "lakes": {
+    "net_capacity": 3, "net_interval": 20,
+    "alligator_probability": 0.002, "alligator_damage": 55, "alligator_cooldown": 12
+  },
   "survivor_state": {
     "health": 100, "hunger": 12, "thirst": 12, "energy": 100,
     "visibility": 2, "endurance": 5, "strength": 5

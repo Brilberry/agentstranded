@@ -22,7 +22,8 @@ from .social import SOCIAL_TOOLS, validate_social
 TASKS = {
     "explore": "Explore for 12 actions",
     "gather_wood": "Gather ten wood",
-    "gather_food": "Gather berries, fish with learned fishing, or hunt visible wildlife with learned bow/hunting",
+    "gather_food": "Gather berries, collect deployed fishing nets, fish with learned fishing, or hunt visible wildlife with learned bow/hunting",
+    "set_fishing_net": "Craft and deploy a net at a lake; requires net_fishing knowledge",
     "drink": "Find water and drink",
     "eat": "Find food and eat",
     "rest": "Recover to 70 energy",
@@ -290,6 +291,7 @@ class ModelPolicy(SurvivalPolicy):
             "skill_guidance": {identity: IslandSkills().load(identity, version="1").context_item().content
                                for identity in sorted(agent.learned_skills)},
             "homestead": self.sim.homestead.context(agent),
+            "lake_crossing_risk": self.sim.lakes.rules["alligator_probability"] if agent.knows_lake_risk else None,
             "climate": self.sim.climate_snapshot(), "cold_exposure": agent.cold_exposure,
             "visible_wildlife": [{"id": animal.id, "kind": animal.kind,
                                   "position": animal.position, "health": animal.health,
@@ -402,6 +404,17 @@ class ModelPolicy(SurvivalPolicy):
 
     def _task_call(self, agent, step):
         task = step.description
+        if task == "set_fishing_net":
+            if "net_fishing" not in agent.learned_skills:
+                step.status, step.error = StepStatus.FAILED, "Must learn net_fishing first"
+                return ToolCall("observe_surroundings"), False
+            if self.sim.lakes.owned(agent):
+                return ToolCall("observe_surroundings"), True
+            call = self._net_action(agent)
+            if call is None:
+                step.status, step.error = StepStatus.FAILED, "No suitable known lake or materials"
+                return ToolCall("observe_surroundings"), False
+            return call, False
         if task in {"grow_vegetables", "make_fire", "cook_food", "make_clothing", "store_water"}:
             required = {"grow_vegetables": "gardening", "make_fire": "fire", "cook_food": "cooking",
                         "make_clothing": "skinning", "store_water": "reservoir"}[task]
@@ -504,7 +517,7 @@ class ModelPolicy(SurvivalPolicy):
                 return self._explore(agent), False
             if target == agent.position:
                 return ToolCall("claim_shelter"), False
-            return ToolCall("move", {"direction": self._direction_toward(agent.position, target)}), False
+            return ToolCall("move", {"direction": self._direction_for(agent, target)}), False
         if task == "drink":
             reservoir = self.sim.homestead.reservoirs.get(agent.home) if self.sim.home_is_valid(agent) else None
             if reservoir and reservoir.water:
@@ -518,7 +531,7 @@ class ModelPolicy(SurvivalPolicy):
                 return self._explore(agent), False
             if self.sim.distance(agent.position, water) <= 1:
                 return ToolCall("drink"), False
-            return ToolCall("move", {"direction": self._direction_toward(agent.position, water)}), False
+            return ToolCall("move", {"direction": self._direction_for(agent, water)}), False
         sid = {"eat": "eat", "rest": "rest", "return_home": "return-home"}[task]
         return self._call_for_step(agent, PlanStep(sid, step.title))
 

@@ -183,7 +183,7 @@ def compete(team, competition):
     return {"engine_version": version("agentstranded"), "bbagents_version": version("bbagents"),
             "runtime": {"python": platform.python_version(), "implementation": platform.python_implementation(),
                         "platform": platform.platform()},
-            "replay_format": "gameplay-state-v1", "ruleset_version": competition["ruleset_version"],
+            "replay_format": "gameplay-state-v2", "ruleset_version": competition["ruleset_version"],
             "engine_sha256": engine_digest.hexdigest(),
             "team": team, "competition": competition,
             "configuration_sha256": hashlib.sha256(json.dumps({"team": team, "competition": competition}, sort_keys=True).encode()).hexdigest(),

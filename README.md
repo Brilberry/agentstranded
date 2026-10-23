@@ -49,6 +49,8 @@ competition team files continue to use the documented 1–10 attribute scale.
 - [Overview, framework loop, controls, and reports](agentstranded/OVERVIEW.md)
 - [Game mechanics](agentstranded/README.md)
 - [Skills, recipes, and survival systems](agentstranded/SURVIVAL_SYSTEMS.md)
+- [Fishing nets, alligator encounters, and shelter evidence](agentstranded/LAKE_ACTIVITIES.md)
+- [Live commentary proposal (not implemented)](agentstranded/LIVE_COMMENTARY_PLAN.md)
 - [Team JSON5, competitions, and scoring](agentstranded/CONFIGURATION.md)
 - [Competition fairness and replay guarantees](agentstranded/COMPETITION_FAIRNESS.md)
 - [Feature backlog](agentstranded/TODO.md)

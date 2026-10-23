@@ -28,13 +28,14 @@ memory, shared recipe gates, and prerequisite-aware free/paid lessons.
 
 Depends on: **1**. Seasonal integration can follow **10** separately.
 
-## 3. Fishing nets
+## 3. Fishing nets — DONE
 
-- [ ] Add a learnable fishing-net recipe, building on fishing knowledge.
-- [ ] Define materials, placement rules, and collection behavior.
-- [ ] Make nets yield more fish than rod fishing, with balancing costs and limits
-  to be decided before implementation.
-- [ ] Account for competition with fish-eating animals once that ecosystem exists.
+- [x] Add a learnable fishing-net recipe, building on fishing knowledge.
+- [x] Define materials, placement rules, and collection behavior.
+- [x] Give nets batch yields with explicit costs: eight wood, capacity three,
+  one fish per 20 ticks, deployment three energy and collection two energy.
+- [x] Consume the same finite lake stocks as rods and bears; one net per survivor,
+  with recovery, ownership checks and abandoned-net reuse.
 
 Depends on: **1** and existing fishing. Ecosystem integration follows **5–6**.
 
@@ -87,28 +88,33 @@ the shared attack cooldown; deer/rabbits retain their escape behavior.
 
 Depends on: **5**. Builds on existing predator hunger and thirst.
 
-## 7. Periodic player-facing summaries
+## 7. Live sports-style commentary — PLAN ONLY
 
-- [ ] Use an LLM to periodically explain what survivors have been doing, rather
-  than only explaining individual deaths afterward.
-- [ ] Highlight changing goals, newly learned skills, collaboration, trades,
-  significant threats, and reasons for changes in behavior.
-- [ ] Ground summaries in recorded events, clearly separating evidence from inference.
-- [ ] Keep summaries asynchronous and budgeted so they do not stall simulation
-  ticks or generate excessive model load.
-- [ ] Reuse existing tracing, reporting, and shared inference scheduling where possible.
-- [ ] Decide summary frequency, presentation, and no-model behavior before implementation.
+- [ ] Produce short, lively sports-broadcast commentary every 500 ticks, not continuously.
+- [ ] Allow significant events to trigger an update: deaths, new skills/tools,
+  narrow escapes, major collaboration, calamities and season changes.
+- [ ] Coalesce bursts and enforce bounded asynchronous inference using the shared gate.
+- [ ] Ground every factual claim in recorded ticks; clearly mark interpretation.
+- [ ] Keep commentary observer-only and excluded from survivor context, decisions and scoring.
+- [ ] Provide a concise live panel and report transcript, with a deterministic no-model fallback.
+
+Detailed proposal, scheduling, framework reuse and acceptance tests:
+[Live commentary plan](LIVE_COMMENTARY_PLAN.md). No commentary implementation yet.
 
 Independent of the ecosystem work; builds on current traces and postmortems.
 
-## 8. Rare alligator encounters in lakes
+## 8. Rare alligator encounters in lakes — DONE
 
-- [ ] Add a very small risk of an alligator attack while crossing lake water.
-- [ ] Define encounter probability, damage, warning signs, and escape options.
-- [ ] Let cautious survivors weigh a longer land route against a risky crossing.
-- [ ] Decide how survivors discover or learn about the danger without granting
+- [x] Add a very small risk of an alligator attack while crossing lake water.
+- [x] Define encounter probability, damage, warning signs, and escape options.
+- [x] Let cautious survivors weigh a longer land route against a risky crossing.
+- [x] Decide how survivors discover or learn about the danger without granting
   them hidden knowledge of alligator positions.
-- [ ] Preserve existing water-crossing slowdowns and include encounter evidence in traces.
+- [x] Preserve existing water-crossing slowdowns and include encounter evidence in traces.
+
+Defaults: 0.2% per lake-occupancy tick, 55 HP, 12-tick encounter cooldown.
+The first attack leaves at least 1 HP; two unhealed attacks kill. Shores and rivers
+are safe from alligators. Healing between attacks can prevent two-hit death.
 
 Builds on current lake crossing. Route choice should reflect individual caution.
 
@@ -129,7 +135,7 @@ Warmth integrates with **11**.
 - [x] Add weather conditions, including summer thunderstorms and extreme heat or cold.
 - [x] Make survivors observe conditions and adjust plans: for example, spend more
   time sheltered during dangerous weather.
-- [x] Define seasonal timing and weather durations: 10-day seasons, daily weather,
+- [x] Define seasonal timing and weather durations: a 365-day year, three-month seasons, daily weather,
   and a shared temperate profile across all maps. Per-map climate tuning is deferred.
 - [x] Integrate thunderstorms with the existing lightning system.
 
@@ -153,17 +159,17 @@ equipped leather protection are implemented.
 
 Depends on: **10**; fire-based warmth also requires **9**.
 
-## 12. Explicit per-tick shelter status in traces and postmortems
+## 12. Explicit per-tick shelter status in traces and postmortems — DONE
 
-- [ ] Add an `in_shelter` field to every `survivor.state` event: integer `1` when
+- [x] Add an `in_shelter` field to every `survivor.state` event: integer `1` when
   the survivor is physically on a tile containing an intact shelter, otherwise `0`.
-- [ ] Compute the flag from current position and world state when recording the
+- [x] Compute the flag from current position and world state when recording the
   event, rather than inferring it from home ownership or a potentially stale cache.
-- [ ] Preserve the flag in the single-file survival report and model postmortem
+- [x] Preserve the flag in the single-file survival report and model postmortem
   context, so analyses do not have to guess shelter occupancy from coordinates.
-- [ ] Explain the field in the postmortem instructions. A value of `0` means
+- [x] Explain the field in the postmortem instructions. A value of `0` means
   outside a shelter; an absent field in older logs means unknown, not outside.
-- [ ] Test entering/leaving a shelter, visiting a shelter owned by somebody else,
+- [x] Test entering/leaving a shelter, visiting a shelter owned by somebody else,
   and destruction by lightning to verify the flag reflects that tick's state.
 
 Independent observability improvement; also supports weather/exposure analysis

@@ -25,6 +25,8 @@ RULES = {
     "bow": SkillRule("Craft a bow from five wood and one stone", 400, 2, resources=("wood", "stone"), signal="wildlife"),
     "hunting": SkillRule("Hunt visible wildlife with a bow", 0, prerequisites=("bow",), tools=("bow",)),
     "fishing": SkillRule("Craft a rod and fish in lakes", 700, 5, signal="lake"),
+    "net_fishing": SkillRule("Weave a wooden-strip fishing net; place it at a lake and collect its finite catch", 1000, 4,
+                             prerequisites=("fishing",), resources=("wood",), signal="lake"),
     "gardening": SkillRule("Plant wild vegetable seeds with berry compost, wood and water near home", 450, 2,
                            resources=("wood", "berries"), signal="home"),
     "fire": SkillRule("Light a fire with three wood and two stone; refuel with wood", 350, 2,
@@ -44,6 +46,7 @@ RECIPES = {
     "spear": ("spear", {"wood": 3}),
     "bow": ("bow", {"wood": 5, "stone": 1}),
     "fishing_rod": ("fishing", {"wood": 4}),
+    "fishing_net": ("net_fishing", {"wood": 8}),
     "flask": (None, {"wood": 2}),
     "ration": (None, {"berries": 2}),
     "knife": ("hunting", {"wood": 1, "stone": 2}),
@@ -72,7 +75,8 @@ class IslandSkills:
             rule.description, Provenance.internal("reviewed-island-skills"),
             required_tools={"gardening": ("plant", "harvest"), "fire": ("light_fire",),
                 "cooking": ("cook",), "skinning": ("skin",), "leatherworking": ("tan_hide", "craft", "equip"),
-                "reservoir": ("craft", "install_reservoir", "fill_reservoir", "drink_reservoir")}.get(skill_id, ("craft",)))
+                "reservoir": ("craft", "install_reservoir", "fill_reservoir", "drink_reservoir"),
+                "net_fishing": ("craft", "place_net", "collect_net", "retrieve_net")}.get(skill_id, ("craft",)))
         return Skill(descriptor, rule.description + ". Prerequisite knowledge: " +
             (", ".join(rule.prerequisites) or "none") + ". Learning does not bypass tool validation.")
 

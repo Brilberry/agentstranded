@@ -19,6 +19,7 @@ from .progression import RULES, NUTRITION, missing_prerequisites
 ITEMS = {"wood", "stone", "berries", "ration", "spear", "axe", "flask", "water", "fish", "fishing_rod", "bow", "meat"}
 ITEMS |= {"vegetables", "cooked_fish", "cooked_meat", "knife", "hide", "leather", "leather_garment"}
 ITEMS.add("reservoir")
+ITEMS.add("fishing_net")
 TOPICS = {"water", "food", "wood", "shelter"} | set(RULES)
 SOCIAL_TOOLS = {"trade", "collaborate", "respond_offer", "cancel_offer", "work_project",
                 "leave_project", "collect_water", "use_water", "communicate"}
@@ -627,7 +628,7 @@ class SocialWorld:
                     call, _ = policy._collect(actor, "wood", min(missing, 7))
                     return call
                 if actor.position != site:
-                    return ToolCall("move", {"direction": policy._direction_toward(actor.position, site)})
+                    return ToolCall("move", {"direction": policy._direction_for(actor, site)})
                 if plan:
                     plan.steps[0].status = StepStatus.DONE
                 return ToolCall("work_project", {"project_id": project["id"]})
@@ -660,7 +661,7 @@ class SocialWorld:
                         and self.sim.world.tile(actor.position).shelter_owner is None
                         and not self.project_at(actor.position)):
                     return ToolCall("collaborate", {"agent_id": identity, "project": {"position": list(actor.position)}})
-            for topic in ("water", "food", "wood", "fishing", "axe", "spear", "bow", "hunting",
+            for topic in ("water", "food", "wood", "fishing", "net_fishing", "axe", "spear", "bow", "hunting",
                           "gardening", "fire", "cooking", "skinning", "leatherworking", "reservoir"):
                 if topic in RULES and missing_prerequisites(actor, topic):
                     continue

@@ -107,6 +107,10 @@ class Survivor:
     thirst: float = 12.0
     energy: float = 100.0
     visibility: int = 2
+    knows_lake_risk: bool = False
+    alligator_attacks: int = 0
+    next_alligator_tick: int = 0
+    last_alligator_check: int = -1
     inventory: Counter[str] = field(default_factory=Counter)
     known_tiles: dict[Position, Terrain] = field(default_factory=dict)
     known_resources: dict[str, set[Position]] = field(default_factory=dict)
@@ -317,6 +321,8 @@ class Simulation:
         self.wildlife = Wildlife(self, seed)
         self.policy = SurvivalPolicy(self)
         self.social = SocialWorld(self)
+        from .lakes import Lakes
+        self.lakes = Lakes(self, seed)
         from .homestead import Homestead
         self.homestead = Homestead(self)
         self.tools = {agent.id: self._make_tools(agent) for agent in self.agents}
@@ -418,6 +424,7 @@ class Simulation:
             if not agent.alive:
                 continue
             self._apply_needs(agent)
+            self.lakes.encounter(agent)
             self.discover_skills(agent)
             if not agent.alive:
                 self.settle_estates()
@@ -495,6 +502,8 @@ class Simulation:
                 "health": agent.health, "hunger": agent.hunger, "thirst": agent.thirst,
                 "energy": agent.energy, "position": agent.position, "inventory": dict(agent.inventory),
                 "home": agent.home, "sleep_remaining": agent.sleep_remaining,
+                "in_shelter": int(self.world.tile(agent.position).shelter_owner is not None),
+                "alligator_attacks": agent.alligator_attacks,
                 "alive": agent.alive, "last_action": agent.last_action,
                 "plan_goal": active_plan.goal if active_plan else None,
                 "model_plan_goal": model_plan.goal if model_plan else None,
@@ -966,6 +975,9 @@ class Simulation:
                 break
             agent.position = max(neighbors, key=lambda pos: min(
                 self.distance(pos, predator.position) for predator in threats))
+            self.lakes.encounter(agent)
+            if not agent.alive:
+                break
         agent.energy -= 3
         self.observe(agent)
         return Observation("flee", f"fled to {agent.position}", {"position": agent.position})
@@ -1073,6 +1085,11 @@ class Simulation:
         for position in self.world.positions_within(agent.position, agent.visibility):
             tile = self.world.tile(position)
             agent.known_tiles[position] = tile.terrain
+            if tile.terrain == Terrain.LAKE and not agent.knows_lake_risk:
+                agent.knows_lake_risk = True
+                agent.memory.remember(MemoryRecord("Lake crossings carry a rare risk of serious alligator attacks; shore fishing is safe.",
+                    source="observed-lake", metadata={"tick": self.tick, "position": position}))
+                self.trace.record("lake.risk_discovered", {"agent": agent.id, "position": position})
             for resource, positions in agent.known_resources.items():
                 if tile.resources[resource] <= 0:
                     positions.discard(position)
@@ -1094,7 +1111,7 @@ class Simulation:
                      "health": animal.health, "thirst": animal.thirst, "behavior": animal.behavior}
                     for animal in self.wildlife.visible(agent)]
         agent.seen_wildlife = agent.seen_wildlife or bool(wildlife)
-        return Observation("world", f"Observed {len(seen)} tiles and {len(nearby)} nearby agents", {"tiles": seen, "nearby_agents": nearby, "predators": threats, "wildlife": wildlife, "climate": self.climate_snapshot(), "homestead": self.homestead.context(agent)})
+        return Observation("world", f"Observed {len(seen)} tiles and {len(nearby)} nearby agents", {"tiles": seen, "nearby_agents": nearby, "predators": threats, "wildlife": wildlife, "climate": self.climate_snapshot(), "homestead": self.homestead.context(agent), "lake_crossing_risk": self.lakes.rules["alligator_probability"] if agent.knows_lake_risk else None})
 
     def available_actions(self, agent: Survivor) -> list[ToolCall]:
         """Concrete legal calls at this location; message text remains free-form."""
@@ -1174,6 +1191,7 @@ class Simulation:
         swimming = (self.world.tile(agent.position).terrain.is_water
                     and self.world.tile(target).terrain.is_water)
         agent.position = target
+        self.lakes.encounter(agent)
         # One-cell rivers stay quick; contiguous water requires two recovery ticks.
         agent.next_move_tick = self.tick + 3 if swimming else self.tick
         agent.energy = max(0.0, agent.energy - 1.2)
@@ -1505,7 +1523,7 @@ class SurvivalPolicy:
         if site is None:
             return None
         if site != agent.position:
-            return ToolCall("move", {"direction": self._direction_toward(agent.position, site)})
+            return ToolCall("move", {"direction": self._direction_for(agent, site)})
         if not self.sim.sleep_site_available(agent, site) and agent.home != site:
             return ToolCall("claim_shelter")
         return ToolCall("rest")
@@ -1642,7 +1660,7 @@ class SurvivalPolicy:
                 if sid == "locate-water":
                     return ToolCall("observe_surroundings"), True
                 if agent.position != agent.home:
-                    return ToolCall("move", {"direction": self._direction_toward(agent.position, agent.home)}), False
+                    return ToolCall("move", {"direction": self._direction_for(agent, agent.home)}), False
                 if sid == "reach-water":
                     return ToolCall("observe_surroundings"), True
                 return ToolCall("drink_reservoir"), agent.thirst < 35
@@ -1685,7 +1703,7 @@ class SurvivalPolicy:
                 return self._explore(agent), False
             if agent.position == target:
                 return ToolCall("observe_surroundings"), True
-            return ToolCall("move", {"direction": self._direction_toward(agent.position, target)}), False
+            return ToolCall("move", {"direction": self._direction_for(agent, target)}), False
         if sid == "claim-home":
             return ToolCall("claim_shelter"), agent.home == agent.position
         if sid == "prepare-food":
@@ -1708,7 +1726,7 @@ class SurvivalPolicy:
                 return self._explore(agent), False
             if self.sim.distance(agent.position, water) <= 1:
                 return ToolCall("drink"), False
-            return ToolCall("move", {"direction": self._direction_toward(agent.position, water)}), False
+            return ToolCall("move", {"direction": self._direction_for(agent, water)}), False
         if sid == "sleep-site":
             unsafe = {tuple(result.record.metadata["position"])
                       for result in agent.memory.retrieve("sleep", limit=8)
@@ -1722,7 +1740,7 @@ class SurvivalPolicy:
                 return ToolCall("claim_shelter"), False
             if site is None or site == agent.position:
                 return ToolCall("observe_surroundings"), True
-            return ToolCall("move", {"direction": self._direction_toward(agent.position, site)}), False
+            return ToolCall("move", {"direction": self._direction_for(agent, site)}), False
         if sid == "wait-night":
             return ToolCall("observe_surroundings"), self.sim.is_night
         if sid == "sleep":
@@ -1747,7 +1765,7 @@ class SurvivalPolicy:
                 if reservoir and reservoir.water > 0:
                     if agent.position == agent.home:
                         return ToolCall("observe_surroundings"), True
-                    return ToolCall("move", {"direction": self._direction_toward(agent.position, agent.home)}), False
+                    return ToolCall("move", {"direction": self._direction_for(agent, agent.home)}), False
             if sid == "reach-water" and agent.inventory["water"]:
                 return ToolCall("observe_surroundings"), True
             target = self.nearest_known_water(agent) if sid == "reach-water" else self._known_shelter(agent)
@@ -1757,7 +1775,7 @@ class SurvivalPolicy:
                 return ToolCall("observe_surroundings"), True
             if agent.position == target:
                 return ToolCall("observe_surroundings"), True
-            return ToolCall("move", {"direction": self._direction_toward(agent.position, target)}), False
+            return ToolCall("move", {"direction": self._direction_for(agent, target)}), False
         if sid == "drink":
             if agent.inventory["water"] and agent.thirst >= 35:
                 return ToolCall("use_water"), False
@@ -1803,7 +1821,7 @@ class SurvivalPolicy:
             if self.sim.social.site_available(agent, agent.position):
                 return ToolCall("observe_surroundings"), True
             target = self._nearest_known(agent, lambda pos: self.sim.social.site_available(agent, pos))
-            return (ToolCall("move", {"direction": self._direction_toward(agent.position, target)}), False) if target else (self._explore(agent), False)
+            return (ToolCall("move", {"direction": self._direction_for(agent, target)}), False) if target else (self._explore(agent), False)
         if sid == "build-shelter":
             return ToolCall("build", {"structure": "shelter"}), self.sim.home_is_valid(agent)
         if sid == "share-water":
@@ -1834,7 +1852,7 @@ class SurvivalPolicy:
         target = min(positions, key=lambda pos: (self.sim.distance(agent.position, pos), pos))
         if agent.position == target or (resource == "stone" and self.sim.distance(agent.position, target) <= 1):
             return ToolCall("gather", {"resource": resource}), False
-        return ToolCall("move", {"direction": self._direction_toward(agent.position, target)}), False
+        return ToolCall("move", {"direction": self._direction_for(agent, target)}), False
 
     def _craft_progress(self, agent: Survivor, item: str) -> ToolCall | None:
         from .progression import RECIPES
@@ -1860,7 +1878,7 @@ class SurvivalPolicy:
             return None
         if self.sim.distance(agent.position, water) <= 1:
             return ToolCall("collect_water")
-        return ToolCall("move", {"direction": self._direction_toward(agent.position, water)})
+        return ToolCall("move", {"direction": self._direction_for(agent, water)})
 
     def _clothing_action(self, agent: Survivor) -> ToolCall | None:
         if agent.inventory["leather_garment"]:
@@ -1874,7 +1892,7 @@ class SurvivalPolicy:
             corpse = min(corpses, key=lambda animal: self.sim.distance(agent.position, animal.position))
             if self.sim.distance(agent.position, corpse.position) <= 1:
                 return ToolCall("skin", {"animal_id": corpse.id})
-            return ToolCall("move", {"direction": self._direction_toward(agent.position, corpse.position)})
+            return ToolCall("move", {"direction": self._direction_for(agent, corpse.position)})
         if "leatherworking" in agent.learned_skills:
             if agent.inventory["leather"] >= 2:
                 return self._craft_progress(agent, "leather_garment")
@@ -1884,7 +1902,7 @@ class SurvivalPolicy:
                 if not agent.inventory["water"]:
                     return self._collect_water_action(agent)
                 if agent.position != agent.home:
-                    return ToolCall("move", {"direction": self._direction_toward(agent.position, agent.home)})
+                    return ToolCall("move", {"direction": self._direction_for(agent, agent.home)})
                 return ToolCall("tan_hide")
         return None
 
@@ -1898,14 +1916,14 @@ class SurvivalPolicy:
             if not agent.inventory["reservoir"]:
                 return self._craft_progress(agent, "reservoir")
             if agent.position != agent.home:
-                return ToolCall("move", {"direction": self._direction_toward(agent.position, agent.home)})
+                return ToolCall("move", {"direction": self._direction_for(agent, agent.home)})
             return ToolCall("install_reservoir")
         if reservoir.water >= 3:
             return None
         if not agent.inventory["water"]:
             return self._collect_water_action(agent)
         if agent.position != agent.home:
-            return ToolCall("move", {"direction": self._direction_toward(agent.position, agent.home)})
+            return ToolCall("move", {"direction": self._direction_for(agent, agent.home)})
         return ToolCall("fill_reservoir")
 
     def _homestead_action(self, agent: Survivor) -> ToolCall | None:
@@ -1914,6 +1932,9 @@ class SurvivalPolicy:
         priorities = agent.behavior.get("priorities", [])
         if priorities and priorities.index("learn_skills") > priorities.index("explore"):
             return None
+        net_action = self._net_action(agent)
+        if net_action:
+            return net_action
         clothing = self._clothing_action(agent)
         if clothing:
             return clothing
@@ -1962,7 +1983,7 @@ class SurvivalPolicy:
             if agent.position == plot.position:
                 return ToolCall("harvest")
             if agent.hunger < 80:
-                return ToolCall("move", {"direction": self._direction_toward(agent.position, plot.position)})
+                return ToolCall("move", {"direction": self._direction_for(agent, plot.position)})
         priorities = agent.behavior.get("priorities", [])
         if priorities and priorities.index("learn_skills") > priorities.index("explore"):
             return None
@@ -1978,7 +1999,7 @@ class SurvivalPolicy:
                  and self.sim.world.tile(pos).shelter_owner is None
                  and not self.sim.social.project_at(pos)]
         if sites:
-            return ToolCall("move", {"direction": self._direction_toward(agent.position, sites[0])})
+            return ToolCall("move", {"direction": self._direction_for(agent, sites[0])})
         return None
 
     def _hunting_food(self, agent: Survivor) -> ToolCall | None:
@@ -2007,12 +2028,43 @@ class SurvivalPolicy:
         if "hunting" not in agent.learned_skills:
             return None
         if self.sim.distance(agent.position, target.position) > 3:
-            return ToolCall("move", {"direction": self._direction_toward(agent.position, target.position)})
+            return ToolCall("move", {"direction": self._direction_for(agent, target.position)})
         if agent.energy < 4 or self.sim.tick < agent.next_hunt_tick:
             return ToolCall("rest")
         return ToolCall("hunt", {"animal_id": target.id})
 
+    def _net_action(self, agent: Survivor) -> ToolCall | None:
+        deployed = self.sim.lakes.owned(agent)
+        if deployed:
+            distance = self.sim.distance(agent.position, deployed.position)
+            if deployed.catch and agent.inventory["fish"] < 3 and distance <= 6:
+                if distance <= 1:
+                    return ToolCall("collect_net") if agent.energy >= 2 else ToolCall("rest")
+                return ToolCall("move", {"direction": self._direction_for(agent, deployed.position)})
+            return None
+        if "net_fishing" not in agent.learned_skills:
+            return None
+        lakes = [pos for pos, terrain in agent.known_tiles.items() if terrain == Terrain.LAKE]
+        if not lakes or agent.behavior.get("preferences", {}).get("food") == "berries":
+            return None
+        target = min(lakes, key=lambda pos: (self.sim.distance(agent.position, pos), pos))
+        if self.sim.distance(agent.position, target) > 6:
+            return None
+        if not agent.inventory["fishing_net"]:
+            return self._craft_progress(agent, "fishing_net")
+        if agent.energy < 3:
+            return ToolCall("rest")
+        if self.sim.lakes.site(agent) is not None:
+            return ToolCall("place_net")
+        return ToolCall("move", {"direction": self._direction_for(agent, target)})
+
     def _fishing_food(self, agent: Survivor) -> ToolCall | None:
+        net = self.sim.lakes.owned(agent)
+        if net and net.catch:
+            if self.sim.distance(agent.position, net.position) <= 1 and agent.energy >= 2:
+                return ToolCall("collect_net")
+            if agent.hunger < 80:
+                return ToolCall("move", {"direction": self._direction_for(agent, net.position)})
         lakes = [pos for pos, terrain in agent.known_tiles.items() if terrain == Terrain.LAKE and self.sim.world.tile(pos).fish_stock > 0]
         food = agent.behavior.get("preferences", {}).get("food", "adaptive")
         if "fishing" not in agent.learned_skills or not lakes or (agent.inventory["berries"] and food != "fish"):
@@ -2027,7 +2079,7 @@ class SurvivalPolicy:
             return ToolCall("craft", {"item": "fishing_rod"})
         target = min(lakes, key=lambda pos: self.sim.distance(agent.position, pos))
         if self.sim.distance(agent.position, target) > 1:
-            return ToolCall("move", {"direction": self._direction_toward(agent.position, target)})
+            return ToolCall("move", {"direction": self._direction_for(agent, target)})
         return ToolCall("fish") if self.sim.can_fish(agent) else ToolCall("rest")
 
     def _target(self, agent: Survivor, target: str) -> Position | None:
@@ -2067,6 +2119,29 @@ class SurvivalPolicy:
         best = max(score for score, _ in candidates)
         directions = [direction for score, direction in candidates if score == best]
         return ToolCall("move", {"direction": self.sim.random.choice(directions)})
+
+    def _direction_for(self, agent: Survivor, target: Position) -> str:
+        if not agent.knows_lake_risk or agent.social_traits.caution < 70:
+            return self._direction_toward(agent.position, target)
+        import heapq
+        queue = [(0, agent.position, "")]
+        costs = {agent.position: 0}
+        while queue:
+            cost, position, first = heapq.heappop(queue)
+            if cost != costs[position]:
+                continue
+            if position == target and first:
+                return first
+            for direction, (dx, dy) in self.sim.DIRECTIONS.items():
+                candidate = (position[0] + dx, position[1] + dy)
+                if not self.sim.world.passable(candidate):
+                    continue
+                lake = agent.known_tiles.get(candidate) == Terrain.LAKE
+                candidate_cost = cost + (1 + agent.social_traits.caution / 10 if lake else 1)
+                if candidate_cost < costs.get(candidate, float("inf")):
+                    costs[candidate] = candidate_cost
+                    heapq.heappush(queue, (candidate_cost, candidate, first or direction))
+        return self._direction_toward(agent.position, target)
 
     def _direction_toward(self, start: Position, target: Position) -> str:
         # Breadth-first search avoids greedy oscillation around mountains.

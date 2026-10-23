@@ -41,7 +41,10 @@ class HomesteadAuthorization:
 
 
 class Homestead:
-    descriptions = {"plant": "Plant vegetables next to your shelter using two berries, one wood and one filled flask",
+    descriptions = {"place_net": "Deploy a fishing net in an adjacent lake; at most one per survivor",
+                    "collect_net": "Collect fish from your nearby net or an abandoned net",
+                    "retrieve_net": "Recover a nearby owned or abandoned net and its catch",
+                    "plant": "Plant vegetables next to your shelter using two berries, one wood and one filled flask",
                     "harvest": "Harvest a mature home vegetable plot",
                     "light_fire": "Light a fire with wood/stone, or refuel an existing fire",
                     "cook": "Roast one raw fish or meat at a nearby burning fire",
@@ -65,6 +68,15 @@ class Homestead:
             survivor = next(agent for agent in self.sim.agents if agent.id == actor)
             return getattr(self, "do_" + name)(survivor, **args)
         return call
+
+    def do_place_net(self, actor):
+        return self.sim.lakes.place(actor)
+
+    def do_collect_net(self, actor):
+        return self.sim.lakes.collect(actor)
+
+    def do_retrieve_net(self, actor):
+        return self.sim.lakes.collect(actor, retrieve=True)
 
     def execute(self, survivor, name, **args):
         actor = survivor
@@ -244,6 +256,7 @@ class Homestead:
             "lost_fire_fuel": fire.fuel if fire else 0, "lost_plots": plots})
 
     def update(self):
+        self.sim.lakes.update()
         for position, fire in list(self.fires.items()):
             exposed = self.sim.world.tile(position).shelter_owner is None
             fire.fuel -= 2 if exposed and self.sim.conditions.weather in {"rainy", "snowy"} else 1
@@ -272,7 +285,7 @@ class Homestead:
             plot.progress = min(160, plot.progress + rate)
 
     def available(self, actor):
-        calls = []
+        calls = self.sim.lakes.available(actor)
         if self.access(actor, actor.position):
             reservoir = self.reservoirs.get(actor.position)
             if not reservoir and "reservoir" in actor.learned_skills and actor.inventory["reservoir"] and actor.energy >= 3:
@@ -307,7 +320,8 @@ class Homestead:
 
     def context(self, actor):
         reservoir = self.reservoirs.get(actor.home) if self.sim.home_is_valid(actor) else None
-        return {"home_reservoir": {"water": reservoir.water, "capacity": reservoir.capacity} if reservoir else None,
+        return {"fishing_nets": self.sim.lakes.context(actor),
+                "home_reservoir": {"water": reservoir.water, "capacity": reservoir.capacity} if reservoir else None,
                 "leather_equipped": actor.leather_equipped and actor.inventory["leather_garment"] > 0,
                 "carcasses": [{"id": animal.id, "kind": animal.kind, "position": animal.position}
                               for animal in self.carcasses(actor)],

@@ -114,7 +114,7 @@ def report_lines(simulation, analyses, *, analysis_status=None):
         end = agent.death_tick if agent.death_tick is not None else simulation.tick
         window = last_window(simulation.trace.iter_rows(agent.id), end)
         damage = sum(row.get("damage", 0) for row in window
-                     if row["event"] in {"survivor.damage", "predator.attacked", "wildlife.attacked"})
+                     if row["event"] in {"survivor.damage", "predator.attacked", "wildlife.attacked", "alligator.attacked"})
         status = f"Died at tick {agent.death_tick}: {agent.death_cause}" if not agent.alive else "Alive"
         analysis = analyses[agent.id]
         start, finish = analysis_markers(agent.id)
@@ -211,7 +211,7 @@ def summarize(agent_id, name, cause, death_tick, events, directory, *, model, en
     for row in window:
         compact = {key: value for key, value in row.items()
                    if key not in {"timestamp", "run_id", "span_id", "parent_span_id"}}
-        priority = 90 if row["event"] in {"survivor.died", "survivor.damage", "predator.attacked", "wildlife.attacked"} else 50
+        priority = 90 if row["event"] in {"survivor.died", "survivor.damage", "predator.attacked", "wildlife.attacked", "alligator.attacked"} else 50
         items.append(ContextItem(json.dumps(compact, default=str), row["event"], priority=priority))
     context = ContextBuilder(ContextBudget(max_items=5000, max_characters=60000)).build(items)
     included_ticks = {json.loads(item.content).get("tick") for item in context.items[1:]}
@@ -264,6 +264,11 @@ def summarize(agent_id, name, cause, death_tick, events, directory, *, model, en
                 "protection only when equipped and still owned. Shelter reservoirs hold ten flask "
                 "units, must be filled from carried water, and drinking consumes a unit for 50 "
                 "thirst relief. Shared residents can use reservoirs; abandoned homes must be claimed. "
+                "State events include in_shelter: integer 1 means physically inside an intact shelter, "
+                "0 means outside. Missing in older logs means unknown, never assume outside. "
+                "Fishing nets collect from the same finite lake stock, never create fish. "
+                "Alligator attacks occur only in lake water, not on shore; each deals up to 55 HP, "
+                "with the first encounter capped to leave at least 1 HP. Two hits without healing are lethal. "
                 "Return a concise summary, likely_contributors, uncertainties, and evidence_ticks."),
         context=context, schema=PostmortemSchema(),
         validate=lambda value: all(tick in included_ticks for tick in value["evidence_ticks"]),

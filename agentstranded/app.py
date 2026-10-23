@@ -181,6 +181,12 @@ def run(*, model: str | None = None, endpoint: str = "http://localhost:11434/api
                 x, y = plot.position
                 pygame.draw.rect(screen, (180, 225, 70) if plot.progress >= 160 else (70, 160, 80),
                                  (x * tile_size + 3, y * tile_size + 3, tile_size - 6, tile_size - 6), 2)
+            for net in sim.lakes.nets.values():
+                x, y = net.position
+                pygame.draw.rect(screen, (235, 210, 140),
+                                 (x * tile_size + 3, y * tile_size + 3, tile_size - 6, tile_size - 6), 1)
+                screen.blit(small.render(str(net.catch), True, (255, 255, 255)),
+                            (x * tile_size + 4, y * tile_size + 1))
             for fire in sim.homestead.fires.values():
                 x, y = fire.position
                 pygame.draw.circle(screen, (255, 130, 25), (x * tile_size + tile_size // 2, y * tile_size + tile_size // 2), 4)
@@ -299,6 +305,9 @@ def run(*, model: str | None = None, endpoint: str = "http://localhost:11434/api
                     elif (mx // tile_size, my // tile_size) in sim.homestead.fires:
                         fire = sim.homestead.fires[(mx // tile_size, my // tile_size)]
                         details = [f"Fire fuel: {fire.fuel} ticks", "Warmth: +8°C within one tile"]
+                    elif (mx // tile_size, my // tile_size) in sim.lakes.nets:
+                        net = sim.lakes.nets[(mx // tile_size, my // tile_size)]
+                        details = [f"Fishing net: {net.catch}/{sim.lakes.rules['net_capacity']} fish", f"Owner: {net.owner}"]
             if details:
                 labels = [small.render(line, True, (240, 240, 240)) for line in details]
                 width = max(label.get_width() for label in labels) + 12

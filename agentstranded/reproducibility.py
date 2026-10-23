@@ -32,7 +32,8 @@ def gameplay_state(sim):
             "predators": sim.predators, "wildlife": sim.wildlife.animals,
             "climate": sim.conditions,
             "plots": sim.homestead.plots, "fires": sim.homestead.fires,
-            "reservoirs": sim.homestead.reservoirs}
+            "reservoirs": sim.homestead.reservoirs, "nets": sim.lakes.nets,
+            "alligator_attacks": [agent.alligator_attacks for agent in sim.agents]}
 
 
 def initial_environment_digest(sim):

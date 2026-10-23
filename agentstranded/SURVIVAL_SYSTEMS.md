@@ -34,6 +34,7 @@ not time since the beginning of a different run.
 | Bow | `400 - 2 × intelligence` | Remember wood/stone; have seen wildlife |
 | Hunting | No additional wait | Know bow-making and possess a bow |
 | Fishing | `700 - 5 × intelligence` | Remember a lake |
+| Net fishing | `1000 - 4 × intelligence` | Know fishing; remember wood and a lake |
 | Gardening | `450 - 2 × intelligence` | Remember wood/berries; have a valid home |
 | Fire | `350 - 2 × intelligence` | Remember wood and stone |
 | Cooking | `450 - 2 × intelligence` | Know fire-making; carry raw fish or meat |

@@ -191,6 +191,10 @@ and ruleset versions, engine source hash, configuration hash, runtime informatio
 per-seed gameplay fingerprints, and lifetime/score breakdowns. See
 [Competition fairness](COMPETITION_FAIRNESS.md) for the reproducibility contract,
 fixed action order, shared environmental conditions, and organizer responsibilities.
+Lake rules (net capacity/interval and alligator probability/damage/cooldown) live
+in organizer-owned `configs/defaults.json` under `lakes`; they are not team-budget
+options. See [Lake activities](LAKE_ACTIVITIES.md). New mechanics change engine
+and replay fingerprints; do not compare these scores with pre-net/alligator runs.
 Engine IDs (`agent-1`, etc.) map to the submission survivors in array order.
 The runner caps recent trace events at 30,000; the interactive viewer retains its
 normal journal/report workflow. This is a local evaluation runner, not an upload

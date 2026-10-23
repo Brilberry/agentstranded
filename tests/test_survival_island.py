@@ -51,6 +51,8 @@ def test_agents_make_progress_over_long_run() -> None:
 
 def test_survivors_live_beyond_original_failure_window() -> None:
     simulation = Simulation(seed=7, predator_interval=None)
+    # Isolate the original needs/provisioning regression from the new lake hazard.
+    simulation.lakes.rules = {**simulation.lakes.rules, "alligator_probability": 0}
     for _ in range(1000):
         simulation.step()
     assert all(agent.alive and agent.health == 100 for agent in simulation.agents)
