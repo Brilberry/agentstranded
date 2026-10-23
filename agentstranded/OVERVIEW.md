@@ -409,6 +409,9 @@ each request has a 90-second timeout and one retry. Model errors produce an erro
 report without discarding the raw history. Use `--no-postmortem` to keep model
 gameplay enabled but save only the event reports. Without `--model`, event reports
 are still generated and no summaries are requested.
+Each survivor's report explicitly identifies disabled, deferred, pending, or
+interrupted analysis. Completed summaries and analysis errors replace that status;
+an export without a configured postmortem model never promises a future summary.
 
 ### Run locally
 

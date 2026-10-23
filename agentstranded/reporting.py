@@ -37,7 +37,7 @@ def saved_analysis(report: Path, agent_id: str) -> str:
                 inside = True
     content = "".join(lines).strip()
     # Placeholders are status messages, not completed analyses to preserve.
-    if content.startswith(("No death analysis:", "If model analysis was enabled,")):
+    if content.startswith(("No death analysis:", "If model analysis was enabled,", "Model analysis status:")):
         return ""
     return content
 
@@ -77,12 +77,12 @@ def last_window(events: list[dict], end_tick: int) -> list[dict]:
     return [row for row in events if max(0, end_tick - 199) <= row.get("tick", -1) <= end_tick]
 
 
-def write_reports(simulation, directory: Path) -> None:
+def write_reports(simulation, directory: Path, *, analysis_status=None) -> None:
     with REPORT_LOCK:
-        _write_reports(simulation, directory)
+        _write_reports(simulation, directory, analysis_status=analysis_status)
 
 
-def _write_reports(simulation, directory: Path) -> None:
+def _write_reports(simulation, directory: Path, *, analysis_status=None) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     report = directory / REPORT_NAME
     simulation.trace.flush()
@@ -91,7 +91,7 @@ def _write_reports(simulation, directory: Path) -> None:
     try:
         with NamedTemporaryFile(mode="w", encoding="utf-8", dir=directory, delete=False) as output:
             temporary = Path(output.name)
-            for line in report_lines(simulation, analyses):
+            for line in report_lines(simulation, analyses, analysis_status=analysis_status):
                 output.write(line + "\n")
         temporary.replace(report)
     finally:
@@ -99,7 +99,7 @@ def _write_reports(simulation, directory: Path) -> None:
             temporary.unlink(missing_ok=True)
 
 
-def report_lines(simulation, analyses):
+def report_lines(simulation, analyses, *, analysis_status=None):
     yield "# Agent Stranded report\n"
     yield f"Simulation stopped/saved at tick {simulation.tick}."
     yield f"Climate: {simulation.conditions.season}, {simulation.conditions.weather}, {simulation.conditions.temperature:g}°C."
@@ -118,8 +118,9 @@ def report_lines(simulation, analyses):
         status = f"Died at tick {agent.death_tick}: {agent.death_cause}" if not agent.alive else "Alive"
         analysis = analyses[agent.id]
         start, finish = analysis_markers(agent.id)
-        analysis_note = ("If model analysis was enabled, its postmortem will appear here once generated."
-                         if not agent.alive else "No death analysis: this survivor is alive at this save.")
+        analysis_note = (analysis_status or {}).get(agent.id,
+            "Model analysis status: not requested. This export contains recorded evidence only."
+            if not agent.alive else "No death analysis: this survivor is alive at this save.")
         lines = [f'<a id="{agent.id}"></a>', f"## {agent.name} ({agent.id})", "", status, "",
                  f"Intelligence: {agent.intelligence}/100.", "",
                  f"Current objective: {simulation.active_objective(agent)}.", "",
@@ -307,10 +308,32 @@ class ReportManager:
         self.submitted: set[str] = set()
         self.saved_deaths: set[str] = set()
         self.futures = []
+        self.future_agents = {}
+        self.interrupted = False
         self.closed = False
 
     def save(self):
-        write_reports(self.simulation, self.directory)
+        statuses = {}
+        report = self.directory / REPORT_NAME
+        for future, agent_id in self.future_agents.items():
+            if future.done():
+                try:
+                    future.result()
+                except Exception as exc:
+                    save_analysis(report, f"### Model postmortem unavailable\n\nAnalysis failed: {exc}", agent_id)
+        for agent in self.simulation.agents:
+            if agent.alive:
+                status = "not applicable: this survivor is alive at this save."
+            elif not self.model:
+                status = "disabled: no postmortem model was configured, or --no-postmortem was used. Recorded evidence is available below; no model summary will be generated."
+            elif self.interrupted and agent.id not in self.submitted:
+                status = "not requested: the run was interrupted before postmortem generation."
+            elif agent.id in self.submitted:
+                status = f"pending: queued or running with model {self.model}."
+            else:
+                status = f"deferred: model {self.model}; analysis starts at natural simulation completion."
+            statuses[agent.id] = "Model analysis status: " + status
+        write_reports(self.simulation, self.directory, analysis_status=statuses)
         print(f"Survival report: {(self.directory / REPORT_NAME).resolve()}", flush=True)
 
     def update(self, *, generate=True):
@@ -326,15 +349,18 @@ class ReportManager:
         for agent in dead:
             self.submitted.add(agent.id)
             if self.pool:
-                self.futures.append(self.pool.submit(summarize, agent.id, agent.name,
+                future = self.pool.submit(summarize, agent.id, agent.name,
                     agent.death_cause, agent.death_tick,
                     last_window(self.simulation.trace.iter_rows(agent.id), agent.death_tick), self.directory,
                     model=self.model, endpoint=self.endpoint, trace=self.simulation.trace,
-                    requester=self.requester, gate=self.gate))
+                    requester=self.requester, gate=self.gate)
+                self.futures.append(future)
+                self.future_agents[future] = agent.id
 
     def close(self, *, generate=True):
         if self.closed:
             return
+        self.interrupted = not generate
         self.update(generate=generate)
         self.save()
         if self.pool:

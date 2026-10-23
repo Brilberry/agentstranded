@@ -5,6 +5,58 @@ from agentstranded.reporting import ReportManager, last_window, survivor_events
 from agentstranded.simulation import Predator
 
 
+def test_no_model_report_explicitly_says_disabled(tmp_path):
+    sim = Simulation(agents=1, predator_interval=None, lightning_probability=0)
+    manager = ReportManager(sim, directory=tmp_path)
+    sim.agents[0].health, sim.agents[0].hunger = 1, 95
+    sim.step()
+    manager.close()
+    report = (tmp_path / "survival-report.md").read_text()
+    assert "Model analysis status: disabled" in report
+    assert "no model summary will be generated" in report
+    assert "If model analysis was enabled" not in report
+
+
+def test_background_worker_failure_is_not_left_pending(monkeypatch, tmp_path):
+    from agentstranded import reporting
+    def fail(*args, **kwargs):
+        raise RuntimeError("summary preparation failed")
+    monkeypatch.setattr(reporting, "summarize", fail)
+    sim = Simulation(agents=1, predator_interval=None, lightning_probability=0)
+    manager = ReportManager(sim, directory=tmp_path, model="fake")
+    sim.agents[0].health, sim.agents[0].hunger = 1, 95
+    sim.step()
+    manager.close()
+    report = (tmp_path / "survival-report.md").read_text()
+    assert "Analysis failed: summary preparation failed" in report
+    assert "Model analysis status: pending" not in report
+
+
+def test_pending_analysis_is_replaced_with_completed_summary(tmp_path):
+    from threading import Event
+    entered, release = Event(), Event()
+    def requester(*args):
+        entered.set()
+        assert release.wait(5)
+        return {"summary": "Evidence based summary.", "likely_contributors": [],
+                "uncertainties": [], "evidence_ticks": [1]}
+    sim = Simulation(agents=1, predator_interval=None, lightning_probability=0)
+    manager = ReportManager(sim, directory=tmp_path, model="fake", requester=requester)
+    sim.agents[0].health, sim.agents[0].hunger = 1, 95
+    sim.step()
+    try:
+        manager.update()
+        assert entered.wait(5)
+        manager.save()
+        assert "Model analysis status: pending" in (tmp_path / "survival-report.md").read_text()
+    finally:
+        release.set()
+        manager.close()
+    report = (tmp_path / "survival-report.md").read_text()
+    assert "Evidence based summary." in report
+    assert "Model analysis status: pending" not in report
+
+
 def test_interrupted_run_saves_evidence_without_requesting_postmortems(tmp_path):
     sim = Simulation(agents=2, predator_interval=None, lightning_probability=0)
     manager = ReportManager(sim, directory=tmp_path, model="fake",
