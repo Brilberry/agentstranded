@@ -1,4 +1,5 @@
 import pytest
+from types import SimpleNamespace
 
 from agentstranded import Simulation
 from agentstranded.simulation import Predator
@@ -8,6 +9,7 @@ from agentstranded.simulation import Predator
 def test_killing_predator_reduces_killers_needs_once(kind, food, hydration):
     simulation = Simulation(agents=2, predator_interval=None)
     agent, other = simulation.agents
+    simulation.combat_random[agent.id] = SimpleNamespace(random=lambda: 0)
     agent.inventory["spear"] = 1
     agent.hunger = agent.thirst = 80
     predator = Predator("prey", kind, agent.position, 25)
@@ -43,6 +45,7 @@ def test_kill_reward_clamps_needs_and_reports_actual_recovery():
     simulation = Simulation(agents=1)
     agent = simulation.agents[0]
     agent.hunger, agent.thirst = 3, 2
+    simulation.combat_random[agent.id] = SimpleNamespace(random=lambda: 0)
     simulation.predators = [Predator("prey", "wolf", agent.position, 1)]
     result = simulation.attack(agent, "prey")
     assert agent.hunger == agent.thirst == 0

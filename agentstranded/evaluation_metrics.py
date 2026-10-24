@@ -241,6 +241,8 @@ class Metrics:
                     entry["first_use_tick"] = tick
 
     def finish(self, sim):
+        from .climate import DAYS_PER_YEAR, TICKS_PER_DAY
+        year_ticks = DAYS_PER_YEAR * TICKS_PER_DAY
         survivors = []
         for agent in sim.agents:
             data = dict(self.actor(agent.id))
@@ -252,11 +254,14 @@ class Metrics:
                 lifetime=agent.death_tick if agent.death_tick is not None else sim.tick,
                 death_cause=agent.death_cause, intelligence=agent.intelligence,
                 final_needs={key: state.get(key) for key in ("health", "hunger", "thirst", "energy")})
+            data["survived_one_year"] = data["lifetime"] - agent.born_tick >= year_ticks
+            data["final_weapon_durability"] = state.get("weapon_durability", {})
             survivors.append(data)
         lifetimes = [entry["lifetime"] for entry in survivors]
         return {"survivors": survivors, "events": self.events, "evidence": dict(self.evidence),
             "summary": {"survivor_ticks": sum(lifetimes), "all_alive_ticks": min(lifetimes, default=0),
                 "alive": sum(agent.alive for agent in sim.agents),
+                "year_ticks": year_ticks, "survived_one_year": sum(entry["survived_one_year"] for entry in survivors),
                 "deaths_with_water": sum("dehydration" in (entry["death_cause"] or "")
                     and bool((entry["inventory_at_death"] or {}).get("water")) for entry in survivors),
                 "death_causes": Counter(entry["death_cause"] for entry in survivors if not entry["alive"])}}

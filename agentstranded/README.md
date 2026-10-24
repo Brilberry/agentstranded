@@ -226,10 +226,13 @@ voice are not implemented yet; lightning is the first weather calamity.
 Predators arrive starting at tick 250, with another arrival every 250 ticks:
 a pack of 2–3 random wolves, another pack, then a lone bear, repeating.
 Wolves have 45 health, stay together, and share prey within each pack, dealing 7 damage per wolf.
-Bears have 150 health, hunt independently, and deal 30 damage. Wolves act every
+Bears have 150 health, hunt independently, and deal 35 damage. Wolves act every
 four ticks. Bears move every two ticks but attack only once every six ticks.
 Touching wolf packs merge into a larger pack.
-Survivor attacks cost 4 energy and have a three-tick cooldown. Predators are visible to agents only
+Survivor attacks cost 4 energy, can miss, and have a three-tick cooldown. Spears
+deal 30 base damage and last 12 attacks. Bows, axes and knives also wear out;
+condition survives trading and inheritance. See [Combat and longevity](COMBAT_AND_LONGEVITY.md)
+for the scoped 20% bear-duel target and full-year evaluation. Predators are visible to agents only
 at close range. Survivors can craft a spear from three wood, attack adjacent
 predators, flee two tiles, or rest to recover when safe. Intact shelters block
 all animal entry and attacks, including boar retaliation. Sheltered survivors can

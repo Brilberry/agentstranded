@@ -28,16 +28,11 @@ memory, shared recipe gates, and prerequisite-aware free/paid lessons.
 
 Depends on: **1**. Seasonal integration can follow **10** separately.
 
-## 3. Fishing nets — DONE
+## 3. Fishing nets — REMOVED after evaluation
 
-- [x] Add a learnable fishing-net recipe, building on fishing knowledge.
-- [x] Define materials, placement rules, and collection behavior.
-- [x] Give nets batch yields with explicit costs: eight wood, capacity three,
-  one fish per 20 ticks, deployment three energy and collection two energy.
-- [x] Consume the same finite lake stocks as rods and bears; one net per survivor,
-  with recovery, ownership checks and abandoned-net reuse.
-
-Depends on: **1** and existing fishing. Ecosystem integration follows **5–6**.
+Previously implemented; removed from skills, recipes, tools, policies, model tasks,
+trading and rendering. Rod fishing remains. Original evaluation reports are kept
+as historical evidence; no further net work is planned.
 
 ## 4. Bow crafting and hunting — DONE
 
@@ -215,7 +210,11 @@ Depends on existing hunting and skill progression. Cold-protection effects requi
 - [x] Streaming survival, food provenance/consumption, water, learning, stalls and performance metrics.
 - [x] JSON results, standalone HTML comparisons and optional compressed event evidence.
 - [x] Feature-off ablations remove both mechanics and policy incentives.
-- [ ] Controlled scenarios, full opportunity/eligibility funnels and calibrated balance targets.
+- [x] Controlled bear, water-access and hunting scenarios with separate scripted/normal-policy cases, HTML reports and explicit diagnostic contracts.
+- [x] Fix carried-water prerequisite handling; add weapon wear and scoped bear calibration; remove fishing nets.
+- [x] Add full-year easy-mode candidate configs and year-survival metrics; demonstrate year-long survival on a development seed.
+- [ ] Validate year-long easy survival across held-out seeds/teams (initial candidate reached a year on only one of three seeds).
+- [ ] Full opportunity/eligibility funnels and calibrated balance targets.
 - [ ] Extended metrics and statistical analyses from METRICS_CATALOG.md.
 
 See [Evaluation guide](EVALUATION.md). Execution-integrity checks are not balance verdicts.

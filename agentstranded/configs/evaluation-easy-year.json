@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "team": "team-easy-year.json",
+  "competition": "competition-easy-year.json",
+  "seeds": [
+    17,
+    42,
+    109
+  ],
+  "max_ticks": 29200,
+  "stall_ticks": 20,
+  "variants": [
+    {
+      "name": "baseline",
+      "overrides": {}
+    }
+  ]
+}

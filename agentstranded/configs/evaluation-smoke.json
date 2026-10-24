@@ -7,7 +7,6 @@
   "stall_ticks": 20,
   "variants": [
     {"name": "baseline", "overrides": {}},
-    {"name": "no-nets", "overrides": {"features": {"fishing_nets": false}}},
     {"name": "no-alligators", "overrides": {"features": {"alligators": false}}}
   ]
 }

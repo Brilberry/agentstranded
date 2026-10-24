@@ -3,7 +3,6 @@ from copy import deepcopy
 import pytest
 
 from agentstranded import Simulation
-from agentstranded.progression import ready
 from agentstranded.simulation import Terrain
 
 
@@ -24,93 +23,6 @@ def scene(count=1):
     sim.lakes.rules = deepcopy(sim.lakes.rules)
     sim.lakes.rules["alligator_probability"] = 0
     return sim, actor
-
-
-def learn_net(sim, actor):
-    sim.learn_skill(actor, "fishing", "teacher")
-    sim.learn_skill(actor, "net_fishing", "teacher")
-    actor.inventory["wood"] = 8
-    sim.craft(actor, "fishing_net")
-
-
-def test_net_progression_and_atomic_deployment():
-    sim, actor = scene()
-    sim.tick = 2000
-    assert not ready(sim, actor, "net_fishing")
-    sim.learn_skill(actor, "fishing", "teacher")
-    assert ready(sim, actor, "net_fishing")
-    with pytest.raises(ValueError):
-        sim.homestead.execute(actor, "place_net")
-    learn_net(sim, actor)
-    sim.homestead.execute(actor, "place_net")
-    assert actor.inventory["fishing_net"] == 0
-    assert len(sim.lakes.nets) == 1
-    actor.inventory["fishing_net"] = 1
-    with pytest.raises(ValueError):
-        sim.homestead.execute(actor, "place_net")
-    assert actor.inventory["fishing_net"] == 1
-
-
-def test_net_capacity_stock_conservation_collection_and_retrieval():
-    sim, actor = scene()
-    learn_net(sim, actor)
-    sim.homestead.execute(actor, "place_net")
-    for tick in (20, 40, 60, 80):
-        sim.tick = tick
-        sim.lakes.update()
-        sim.lakes.update()  # Repeated update calls cannot catch twice in one tick.
-    net = sim.lakes.owned(actor)
-    assert net.catch == 3
-    assert sim.world.tile(net.position).fish_stock == 0
-    sim.homestead.execute(actor, "collect_net")
-    assert actor.inventory["fish"] == 3 and net.catch == 0
-    sim.tick = 100
-    sim.lakes.update()
-    assert net.catch == 0  # No free fish from an empty lake.
-    sim.homestead.execute(actor, "retrieve_net")
-    assert actor.inventory["fishing_net"] == 1 and not sim.lakes.nets
-
-
-def test_net_access_abandonment_and_bound_actor_validation():
-    sim, owner = scene(2)
-    visitor = sim.agents[1]
-    visitor.position = owner.position
-    learn_net(sim, owner)
-    sim.homestead.execute(owner, "place_net")
-    with pytest.raises(ValueError):
-        sim.homestead.execute(visitor, "retrieve_net")
-    with pytest.raises(ValueError):
-        sim.homestead.execute(owner, "collect_net", actor=visitor.id)
-    owner.alive = False
-    sim.homestead.execute(visitor, "retrieve_net")
-    assert visitor.inventory["fishing_net"] == 1
-
-
-def test_rule_policy_crafts_and_deploys_net():
-    sim, actor = scene()
-    learn_net(sim, actor)
-    call = sim.policy._net_action(actor)
-    assert call.tool_name == "place_net"
-    sim.homestead.execute(actor, call.tool_name)
-    sim.lakes.owned(actor).catch = 2
-    assert sim.policy._fishing_food(actor).tool_name == "collect_net"
-
-
-def test_model_net_milestone_executes_validated_tools():
-    from bbagents import PlanStep
-    from agentstranded.model_policy import ModelPolicy
-    sim, actor = scene()
-    learn_net(sim, actor)
-    policy = ModelPolicy(sim, model="fake")
-    try:
-        step = PlanStep("net", "Deploy a net", description="set_fishing_net")
-        call, done = policy._task_call(actor, step)
-        assert call.tool_name == "place_net" and not done
-        assert sim.action_is_available(call, sim.available_actions(actor))
-        sim.homestead.execute(actor, call.tool_name)
-        assert policy._task_call(actor, step)[1]
-    finally:
-        policy.close()
 
 
 def test_shelter_flag_is_available_to_model_postmortem(tmp_path):

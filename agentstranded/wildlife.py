@@ -77,6 +77,8 @@ class Wildlife:
         actor.next_hunt_tick = self.sim.tick + 4
         hit = self.hunting.random() < SPECIES[animal.kind]["hit"]
         damage = min(animal.health, 16 + actor.strength * 2) if hit else 0
+        from .weapons import use
+        use(self.sim, actor, "bow", "hunt")
         animal.health -= damage
         animal.provoked_until = self.sim.tick + 12
         animal.target_id = actor.id

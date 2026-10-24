@@ -45,4 +45,4 @@ def test_destroyed_shelter_no_longer_blocks_attack():
     bear.position = agent.position
     sim.tick = 4
     sim._update_predators()
-    assert agent.health == 70
+    assert agent.health == 65

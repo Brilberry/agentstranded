@@ -26,13 +26,13 @@ def encode(value):
 def gameplay_state(sim):
     fields = ("id", "position", "health", "hunger", "thirst", "energy", "alive",
               "inventory", "home", "learned_skills", "death_tick", "death_cause",
-              "sleep_remaining", "cold_exposure", "leather_equipped")
+              "sleep_remaining", "cold_exposure", "leather_equipped", "weapon_durability")
     return {"tick": sim.tick, "agents": [{key: getattr(agent, key) for key in fields}
                                          for agent in sim.agents],
             "predators": sim.predators, "wildlife": sim.wildlife.animals,
             "climate": sim.conditions,
             "plots": sim.homestead.plots, "fires": sim.homestead.fires,
-            "reservoirs": sim.homestead.reservoirs, "nets": sim.lakes.nets,
+            "reservoirs": sim.homestead.reservoirs,
             "alligator_attacks": [agent.alligator_attacks for agent in sim.agents]}
 
 

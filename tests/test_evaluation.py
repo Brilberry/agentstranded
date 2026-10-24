@@ -27,8 +27,8 @@ def evaluation_config(tmp_path, **updates):
 def test_headless_evaluation_censoring_pairing_and_framework_contracts(tmp_path):
     config = evaluation_config(tmp_path)
     report = evaluate(config, tmp_path / "results", events=True)
-    assert len(report["runs"]) == 3
-    assert report["framework_experiment"]["summary"]["passed"] == 3
+    assert len(report["runs"]) == 2
+    assert report["framework_experiment"]["summary"]["passed"] == 2
     assert len({run["initial_environment_sha256"] for run in report["runs"]}) == 1
     for run in report["runs"]:
         assert run["status"] == "completed" and run["termination"] == "tick_limit"
@@ -146,7 +146,7 @@ def test_consumption_event_measures_actual_capped_relief():
 
 
 def test_disabled_features_remove_discovery_policy_and_hazards():
-    from agentstranded.progression import ready
+    from agentstranded.progression import RULES
     from agentstranded.simulation import Terrain
     sim = Simulation(agents=1, predator_interval=None, features={"fishing_nets": False, "alligators": False})
     actor = sim.agents[0]
@@ -154,11 +154,10 @@ def test_disabled_features_remove_discovery_policy_and_hazards():
     actor.known_resources["wood"] = {(1, 1)}
     actor.known_tiles[(1, 1)] = Terrain.LAKE
     sim.tick = 5000
-    assert not ready(sim, actor, "net_fishing")
-    assert sim.policy._net_action(actor) is None
-    with pytest.raises(ValueError, match="disabled"):
-        sim.learn_skill(actor, "net_fishing", "teacher")
-    with pytest.raises(ValueError, match="disabled"):
+    assert "net_fishing" not in RULES
+    sim.learn_skill(actor, "net_fishing", "teacher")
+    assert "net_fishing" not in actor.learned_skills
+    with pytest.raises(ValueError, match="unknown recipe"):
         sim.craft(actor, "fishing_net")
     sim.world.tile(actor.position).terrain = Terrain.LAKE
     sim.lakes.rules = {**sim.lakes.rules, "alligator_probability": 1}
@@ -201,7 +200,7 @@ def test_failed_cases_are_explicit_and_excluded_from_comparisons(monkeypatch, tm
     report = evaluate(config, tmp_path / "results")
     assert all(run["status"] == "error" for run in report["runs"])
     assert all(comparison["paired_seeds"] == 0 and comparison["mean_score_delta"] is None for comparison in report["comparisons"])
-    assert report["framework_experiment"]["summary"]["failed"] == 3
+    assert report["framework_experiment"]["summary"]["failed"] == 2
 
 
 def test_ctrl_c_preserves_partial_results_without_models(monkeypatch, tmp_path):

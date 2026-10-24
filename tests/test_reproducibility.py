@@ -49,11 +49,11 @@ def test_competition_replays_across_processes_and_hash_seeds(seed):
     first = replay(seed, 1)
     assert first == replay(seed, 271)
     expected = {
-        17: "40cc4efb22085e7e0c2cd2d4b5dbde3ea266339b43576f30ba0b6aa1643f0b55",
-        42: "8177756964d314e4757ee55837e4458c31427239e5e9a333dee1e8ad60ed55fb",
+        17: "8c2f7e18e57f99c12aab9c3ea0806786d01199e5b0bb39c20fa7f3b01c9a367e",
+        42: "cdc43c123bc89bf5ab9b2e5a6af3d8d17bccce1c16a6a3773a3b0816a90167bc",
     }
     assert first["digest"] == expected[seed]
-    assert first["score"]["score"] == {17: 11528, 42: 16000}[seed]
+    assert first["score"]["score"] == {17: 15946, 42: 8042}[seed]
 
 
 def test_different_environment_seeds_change_replay():

@@ -266,7 +266,7 @@ def summarize(agent_id, name, cause, death_tick, events, directory, *, model, en
                 "thirst relief. Shared residents can use reservoirs; abandoned homes must be claimed. "
                 "State events include in_shelter: integer 1 means physically inside an intact shelter, "
                 "0 means outside. Missing in older logs means unknown, never assume outside. "
-                "Fishing nets collect from the same finite lake stock, never create fish. "
+                "Weapons have finite uses; weapon_durability records condition, and weapon.broken records breakage. "
                 "Alligator attacks occur only in lake water, not on shore; each deals up to 55 HP, "
                 "with the first encounter capped to leave at least 1 HP. Two hits without healing are lethal. "
                 "Return a concise summary, likely_contributors, uncertainties, and evidence_ticks."),

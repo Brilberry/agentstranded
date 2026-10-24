@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "seeds": [17, 42, 109, 8, 23, 31, 51, 67, 83, 97, 113, 127, 139, 151, 163, 179, 193, 211, 227, 241],
+  "scenarios": [
+    "bear-unarmed", "bear-spear", "bear-worn-spear", "bear-shelter", "bear-policy",
+    "water-adjacent", "water-distant", "water-carried", "water-absent",
+    "hunt-rabbit", "hunt-deer", "hunt-boar", "hunt-rabbit-policy",
+    "hunt-no-bow", "hunt-untrained"
+  ]
+}

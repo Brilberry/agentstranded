@@ -62,6 +62,8 @@ def validate_config(config):
                 if (not isinstance(value, dict) or set(value) - {"fishing_nets", "alligators"}
                         or any(type(flag) is not bool for flag in value.values())):
                     raise ValueError("features supports boolean fishing_nets and alligators")
+                if value.get("fishing_nets", False):
+                    raise ValueError("fishing nets have been removed; delete this flag")
             elif key == "starting_season":
                 if value not in ("spring", "summer", "autumn", "winter"):
                     raise ValueError("invalid starting_season")
@@ -93,7 +95,7 @@ def isolated_environment(case):
             holder["simulation"].trace.close()
 
 
-def simulate_case(case, holder, trial_id, configuration, team, rules, output, *, events=False, memory=False):
+def simulate_case(case, holder, trial_id, configuration, team, rules, output, *, events=False, memory=False, prepare=None):
     seed, variant = case.input["seed"], case.input["variant"]
     metrics = Metrics(configuration["stall_ticks"])
     started = perf_counter()
@@ -110,6 +112,8 @@ def simulate_case(case, holder, trial_id, configuration, team, rules, output, *,
             "starting_season": rules["starting_season"], **variant["overrides"]}
         sim = Simulation(**parameters)
         holder["simulation"] = sim
+        if prepare is not None:
+            result["scenario"] = prepare(sim)
         distances = sim._water_distances()
         result["initial_water_distance_by_slot"] = {actor.id: distances.get(actor.position) for actor in sim.agents}
         result["initial_environment_sha256"] = initial_environment_digest(sim)
@@ -228,16 +232,34 @@ def render_report(report, output):
         "<title>Agent Stranded evaluation</title><style>body{font:16px system-ui;max-width:1150px;margin:30px auto;padding:0 20px}table{border-collapse:collapse}td,th{padding:8px;border:1px solid #ccc}pre{white-space:pre-wrap;overflow-wrap:anywhere}summary{cursor:pointer}</style></head><body>",
         "<h1>Agent Stranded evaluation</h1><p>Descriptive results, not an automatic balance verdict. Positive paired deltas favor the candidate. Living survivors at the cap are censored, not dead.</p>",
         "<p>Read <a href='results.json'>results.json</a> for all machine-readable measurements.</p>",
-        "<h2>Variant overview</h2><table><tr><th>Variant</th><th>Completed/error</th><th>Mean score</th><th>Median score</th><th>Survivors at cap</th><th>Seconds</th></tr>"]
+        "<h2>Variant overview</h2><table><tr><th>Variant</th><th>Completed/error</th><th>Mean score</th><th>Median score</th><th>Survivors at cap</th><th>Reached one year</th><th>Seconds</th></tr>"]
     for variant in report["configuration"]["variants"]:
         rows = [row for row in report["runs"] if row["variant"] == variant["name"]]
         completed = [row for row in rows if row["status"] == "completed"]
         scores = [row["score"]["score"] for row in completed]
         values = (variant["name"], f"{len(completed)}/{len(rows)-len(completed)}",
             round(mean(scores), 2) if scores else "N/A", median(scores) if scores else "N/A",
-            sum(row["metrics"]["summary"]["alive"] for row in completed), round(sum(row["duration_seconds"] for row in rows), 2))
+            sum(row["metrics"]["summary"]["alive"] for row in completed),
+            sum(row["metrics"]["summary"].get("survived_one_year", 0) for row in completed)
+                if (report["configuration"].get("max_ticks") or 0) >= 29200 else "N/A (short horizon)",
+            round(sum(row["duration_seconds"] for row in rows), 2))
         sections.append("<tr>" + "".join(f"<td>{escape(value)}</td>" for value in values) + "</tr>")
-    sections.append("</table><h2>Paired comparisons</h2>")
+    sections.append("</table>")
+    if "scenario_summary" in report:
+        sections.append("<h2>Controlled scenarios</h2><p>Artificial diagnostic arenas, not competition scores or natural encounter rates. Fixed controllers test mechanics; normal-policy cases test decisions. Checks are narrow contracts, not calibrated balance targets. Surviving at the cap does not imply indefinite survival.</p>")
+        sections.append("<table><tr><th>Scenario / controller</th><th>Completed</th><th>Alive at cap</th><th>Prey kills / meat meals</th><th>Mean HP (all / alive)</th><th>Mean drinks</th><th>Checks passed / checked</th></tr>")
+        for name, summary in report["scenario_summary"].items():
+            values = (f"{name} / {summary['controller']}", summary["completed"], summary["alive_at_cap"],
+                f"{summary['prey_kills']} / {summary['meat_meals']}",
+                f"{summary['mean_final_hp']} / {summary.get('mean_hp_of_survivors', 'N/A')}", summary["mean_drinks"],
+                f"{summary['checks_passed']} / {summary['checks_checked']}")
+            sections.append("<tr>" + "".join(f"<td>{escape(value)}</td>" for value in values) + "</tr>")
+        sections.append("</table><p>Each run below includes its prepared state, endpoints, explicit check outcomes, replay hash and evidence archive.</p>")
+        failed = [{"scenario": run["variant"], "seed": run["seed"], "check": name}
+                  for run in report["runs"] for name, passed in run.get("checks", {}).items() if not passed]
+        if failed:
+            sections.append("<h3>Failed diagnostic checks (investigate)</h3><pre>" + escape(json.dumps(failed, indent=2)) + "</pre>")
+    sections.append("<h2>Paired comparisons</h2>")
     for comparison in report["comparisons"]:
         sections.append(f"<h3>{escape(comparison['candidate'])} versus {escape(comparison['baseline'])}</h3><pre>{escape(json.dumps(comparison, indent=2))}</pre>")
     sections.append("<h2>Food, water, damage and learning</h2><p>Rates use observed end-of-tick samples, not eligible-opportunity estimates. Learning fractions use all starters, not just eligible survivors.</p>")

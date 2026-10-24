@@ -19,7 +19,6 @@ from .progression import RULES, NUTRITION, missing_prerequisites
 ITEMS = {"wood", "stone", "berries", "ration", "spear", "axe", "flask", "water", "fish", "fishing_rod", "bow", "meat"}
 ITEMS |= {"vegetables", "cooked_fish", "cooked_meat", "knife", "hide", "leather", "leather_garment"}
 ITEMS.add("reservoir")
-ITEMS.add("fishing_net")
 TOPICS = {"water", "food", "wood", "shelter"} | set(RULES)
 SOCIAL_TOOLS = {"trade", "collaborate", "respond_offer", "cancel_offer", "work_project",
                 "leave_project", "collect_water", "use_water", "communicate"}
@@ -185,8 +184,6 @@ class SocialWorld:
         return self.offer(actor, agent_id, "trade", offer, request)
 
     def information(self, actor, topic):
-        if topic == "net_fishing" and not self.sim.features["fishing_nets"]:
-            raise ValueError("net fishing is disabled")
         if topic not in TOPICS:
             raise ValueError("unsupported information topic")
         if topic in RULES:
@@ -207,8 +204,6 @@ class SocialWorld:
 
     def learn(self, actor, information, sender):
         if information["topic"] in RULES:
-            if information["topic"] == "net_fishing" and not self.sim.features["fishing_nets"]:
-                return
             if missing_prerequisites(actor, information["topic"]):
                 self.sim.trace.record("skill.lesson_deferred", {"agent": actor.id,
                     "skill": information["topic"], "sender": sender,
@@ -311,8 +306,6 @@ class SocialWorld:
             self._record("social.offer_rejected", [actor, sender], offer=offer_id)
             return Observation("respond_offer", f"rejected {offer_id}")
         if offer["kind"] == "information" and offer["information"]["topic"] in RULES:
-            if offer["information"]["topic"] == "net_fishing" and not self.sim.features["fishing_nets"]:
-                raise ValueError("net fishing is disabled")
             missing = missing_prerequisites(actor, offer["information"]["topic"])
             if missing:
                 raise ValueError("cannot buy a lesson before learning its prerequisites")
@@ -344,12 +337,15 @@ class SocialWorld:
         self.offers.save(offer_id, offer, expected_version=snapshot.version)
         for giver, receiver, items in ((sender, actor, offer["give"]), (actor, sender, offer["want"])):
             giver_before, receiver_before = dict(giver.inventory), dict(receiver.inventory)
+            from .weapons import transfer
+            condition = transfer(giver, receiver, items)
             for item, amount in items.items():
                 giver.inventory[item] -= amount
                 receiver.inventory[item] += amount
             self.sim.trace.record("inventory.transferred", {"sender": giver.id,
                 "recipient": receiver.id, "items": dict(items), "reason": "exchange",
-                "sender_inventory_before": giver_before, "recipient_inventory_before": receiver_before})
+                "sender_inventory_before": giver_before, "recipient_inventory_before": receiver_before,
+                "weapon_durability": condition})
         for participant in (sender, actor):
             if participant.inventory["leather_garment"] == 0:
                 participant.leather_equipped = False
@@ -542,9 +538,6 @@ class SocialWorld:
     def policy_response(self, actor, offer):
         """Individual preferences return framework authorization decisions, not effects."""
         traits = actor.social_traits
-        if (offer["kind"] == "information" and offer["information"]["topic"] == "net_fishing"
-                and not self.sim.features["fishing_nets"]):
-            return AuthorizationDecision.deny("net fishing is disabled")
         if (offer["kind"] == "information" and offer["information"]["topic"] in RULES
                 and missing_prerequisites(actor, offer["information"]["topic"])):
             return AuthorizationDecision.deny("missing prerequisite knowledge")
@@ -676,10 +669,8 @@ class SocialWorld:
                         and self.sim.world.tile(actor.position).shelter_owner is None
                         and not self.project_at(actor.position)):
                     return ToolCall("collaborate", {"agent_id": identity, "project": {"position": list(actor.position)}})
-            for topic in ("water", "food", "wood", "fishing", "net_fishing", "axe", "spear", "bow", "hunting",
+            for topic in ("water", "food", "wood", "fishing", "axe", "spear", "bow", "hunting",
                           "gardening", "fire", "cooking", "skinning", "leatherworking", "reservoir"):
-                if topic == "net_fishing" and not self.sim.features["fishing_nets"]:
-                    continue
                 if topic in RULES and missing_prerequisites(actor, topic):
                     continue
                 if topic in {"gardening", "fire", "cooking", "reservoir"} and not self.sim.home_is_valid(actor):

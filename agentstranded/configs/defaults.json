@@ -4,9 +4,12 @@
     "lightning_probability": 0.004, "resource_scale": 1,
     "berry_regrowth": 2, "max_ticks": null, "starting_season": "spring"
   },
-  "features": {"fishing_nets": true, "alligators": true},
+  "features": {"alligators": true},
+  "weapons": {"spear": 12, "axe": 32, "bow": 24, "knife": 20},
+  "combat": {"spear_damage": 30, "axe_damage": 12, "bow_damage": 20, "knife_damage": 8,
+    "unarmed_damage": 5, "bear_damage": 35, "wolf_damage": 7,
+    "bear_melee_hit_chance": 0.7247796636776955, "other_hit_chance": 0.9},
   "lakes": {
-    "net_capacity": 3, "net_interval": 20,
     "alligator_probability": 0.002, "alligator_damage": 55, "alligator_cooldown": 12
   },
   "survivor_state": {
@@ -21,7 +24,7 @@
     {"name": "Ena", "objective": "Explore and survive independently", "intelligence_range": [20, 85], "personality_range": [5, 95]}
   ],
   "maps": {
-    "easy-island": {"resources": 2, "regrowth": 4, "predator_interval": 500},
+    "easy-island": {"resources": 2, "regrowth": 4, "predator_interval": 2000},
     "balanced-island": {"resources": 1, "regrowth": 2, "predator_interval": 250},
     "hard-island": {"resources": 0.5, "regrowth": 1, "predator_interval": 125}
   },

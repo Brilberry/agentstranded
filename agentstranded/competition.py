@@ -201,7 +201,7 @@ def engine_metadata():
             "source_git_revision": revision, "source_worktree_dirty": dirty,
             "runtime": {"python": platform.python_version(), "implementation": platform.python_implementation(),
                         "platform": platform.platform()},
-            "replay_format": "gameplay-state-v2", "engine_sha256": engine_digest.hexdigest()}
+            "replay_format": "gameplay-state-v3", "engine_sha256": engine_digest.hexdigest()}
 
 
 def main():

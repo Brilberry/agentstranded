@@ -159,7 +159,7 @@ resource counts and predator pressure vary:
 
 | Map | Starting resources | Forest berry regrowth per 80 ticks | Predator wave interval |
 | --- | --- | --- | --- |
-| `easy-island` | 2× baseline | 4, capped at 7 per tile | 500 ticks |
+| `easy-island` | 2× baseline | 4, capped at 7 per tile | 2,000 ticks |
 | `balanced-island` | Baseline | 2, capped at 7 per tile | 250 ticks |
 | `hard-island` | 0.5×, rounded down, minimum 1 for existing resources | 1, capped at 7 per tile | 125 ticks |
 
@@ -191,10 +191,12 @@ and ruleset versions, engine source hash, configuration hash, runtime informatio
 per-seed gameplay fingerprints, and lifetime/score breakdowns. See
 [Competition fairness](COMPETITION_FAIRNESS.md) for the reproducibility contract,
 fixed action order, shared environmental conditions, and organizer responsibilities.
-Lake rules (net capacity/interval and alligator probability/damage/cooldown) live
+Lake rules (alligator probability/damage/cooldown) live
 in organizer-owned `configs/defaults.json` under `lakes`; they are not team-budget
 options. See [Lake activities](LAKE_ACTIVITIES.md). New mechanics change engine
-and replay fingerprints; do not compare these scores with pre-net/alligator runs.
+and replay fingerprints; compare only identical engine versions. Fishing nets have
+been removed; rods still work. Weapon capacities and combat parameters also live
+in `defaults.json`, under `weapons` and `combat`; they are organizer-owned rules.
 Engine IDs (`agent-1`, etc.) map to the submission survivors in array order.
 The runner caps recent trace events at 30,000; the interactive viewer retains its
 normal journal/report workflow. This is a local evaluation runner, not an upload

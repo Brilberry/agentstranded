@@ -17,14 +17,14 @@ from bbagents.optimization import Cache
 from .inference import InferenceGate
 from .simulation import SurvivalPolicy
 from .social import SOCIAL_TOOLS, validate_social
+from .weapons import snapshot as weapon_snapshot
 from .behavior import PreparedChoice
 
 
 TASKS = {
     "explore": "Explore for 12 actions",
     "gather_wood": "Gather ten wood",
-    "gather_food": "Gather berries, collect deployed fishing nets, fish with learned fishing, or hunt visible wildlife with learned bow/hunting",
-    "set_fishing_net": "Craft and deploy a net at a lake; requires net_fishing knowledge",
+    "gather_food": "Gather berries, fish with learned fishing, or hunt visible wildlife with learned bow/hunting",
     "drink": "Find water and drink",
     "eat": "Find food and eat",
     "rest": "Recover to 70 energy",
@@ -285,6 +285,7 @@ class ModelPolicy(SurvivalPolicy):
             "health": round(agent.health), "hunger": round(agent.hunger),
             "thirst": round(agent.thirst), "energy": round(agent.energy), "home": agent.home,
             "position": agent.position, "inventory": dict(agent.inventory),
+            "weapon_durability": weapon_snapshot(agent),
             "learned_skills": sorted(agent.learned_skills),
             "skill_progress": [{"id": identity, "discovery_age": rule.age(agent.intelligence),
                                 "missing": missing_prerequisites(agent, identity)}
@@ -405,17 +406,6 @@ class ModelPolicy(SurvivalPolicy):
 
     def _task_call(self, agent, step):
         task = step.description
-        if task == "set_fishing_net":
-            if "net_fishing" not in agent.learned_skills:
-                step.status, step.error = StepStatus.FAILED, "Must learn net_fishing first"
-                return ToolCall("observe_surroundings"), False
-            if self.sim.lakes.owned(agent):
-                return ToolCall("observe_surroundings"), True
-            call = self._net_action(agent)
-            if call is None:
-                step.status, step.error = StepStatus.FAILED, "No suitable known lake or materials"
-                return ToolCall("observe_surroundings"), False
-            return call, False
         if task in {"grow_vegetables", "make_fire", "cook_food", "make_clothing", "store_water"}:
             required = {"grow_vegetables": "gardening", "make_fire": "fire", "cook_food": "cooking",
                         "make_clothing": "skinning", "store_water": "reservoir"}[task]

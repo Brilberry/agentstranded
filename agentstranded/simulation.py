@@ -24,6 +24,7 @@ from .progression import NUTRITION
 from .social import SocialTraits, SocialWorld
 from .settings import DEFAULTS, SIMULATION_DEFAULTS as CONFIG
 from .behavior import BehaviorContext, PreparedChoice, RULE_ORDER, MODEL_ORDER, make_selector
+from .weapons import snapshot as weapon_snapshot
 
 
 Position = tuple[int, int]
@@ -55,8 +56,13 @@ class Tile:
     shelter_capacity: int = 1
     shelter_residents: set[str] = field(default_factory=set)
     shelter_storage: Counter[str] = field(default_factory=Counter)
+    weapon_durability: dict[str, list[int]] = field(default_factory=dict)
     fish_stock: int = 3
     fish_capacity: int = 3
+
+    @property
+    def inventory(self):
+        return self.shelter_storage
 
 
 @dataclass(slots=True)
@@ -113,6 +119,7 @@ class Survivor:
     next_alligator_tick: int = 0
     last_alligator_check: int = -1
     inventory: Counter[str] = field(default_factory=Counter)
+    weapon_durability: dict[str, list[int]] = field(default_factory=dict)
     known_tiles: dict[Position, Terrain] = field(default_factory=dict)
     known_resources: dict[str, set[Position]] = field(default_factory=dict)
     inbox: deque[Message] = field(default_factory=deque)
@@ -253,8 +260,10 @@ class Simulation:
                  max_ticks: int | None = CONFIG["max_ticks"], starting_season: str = CONFIG["starting_season"],
                  features: dict | None = None) -> None:
         self.features = {**DEFAULTS["features"], **(features or {})}
-        if set(self.features) != {"fishing_nets", "alligators"} or any(type(value) is not bool for value in self.features.values()):
-            raise ValueError("features supports boolean fishing_nets and alligators only")
+        if self.features.pop("fishing_nets", False) is not False:
+            raise ValueError("fishing nets have been removed")
+        if set(self.features) != {"alligators"} or any(type(value) is not bool for value in self.features.values()):
+            raise ValueError("features supports boolean alligators only")
         if predator_interval is not None and predator_interval < 1:
             raise ValueError("predator_interval must be positive or None")
         if not 0 <= lightning_probability <= 1:
@@ -331,6 +340,8 @@ class Simulation:
         from .homestead import Homestead
         self.homestead = Homestead(self)
         self.tools = {agent.id: self._make_tools(agent) for agent in self.agents}
+        self.combat_random = {agent.id: random.Random(seed + 14001 + index * 7919)
+                              for index, agent in enumerate(self.agents)}
         for agent in self.agents:
             self.observe(agent)
             self.policy._update_objective(agent)
@@ -506,6 +517,7 @@ class Simulation:
                 "social": self.social.context(agent),
                 "health": agent.health, "hunger": agent.hunger, "thirst": agent.thirst,
                 "energy": agent.energy, "position": agent.position, "inventory": dict(agent.inventory),
+                "weapon_durability": weapon_snapshot(agent),
                 "home": agent.home, "sleep_remaining": agent.sleep_remaining,
                 "in_shelter": int(self.world.tile(agent.position).shelter_owner is not None),
                 "in_lake": int(self.world.tile(agent.position).terrain == Terrain.LAKE),
@@ -678,6 +690,8 @@ class Simulation:
             position = deceased.home
             tile = self.world.tile(position)
             items = {name: count for name, count in deceased.inventory.items() if count > 0}
+            from .weapons import transfer
+            condition = transfer(deceased, tile, items)
             tile.shelter_storage.update(items)
             deceased.inventory.clear()
             deceased.leather_equipped = False
@@ -688,7 +702,7 @@ class Simulation:
                 tile.shelter_owner = residents[0].id
             deceased.home = None
             self.trace.record("survivor.estate_stored", {"agent": deceased.id,
-                "position": position, "items": items, "tick": self.tick})
+                "position": position, "items": items, "weapon_durability": condition, "tick": self.tick})
 
     def claim_shelter(self, agent: Survivor) -> Observation:
         if not agent.alive or agent.sleep_remaining:
@@ -705,12 +719,14 @@ class Simulation:
             tile.shelter_owner = agent.id
         tile.shelter_residents = active_residents | {agent.id}
         inherited = dict(tile.shelter_storage)
+        from .weapons import transfer
+        condition = transfer(tile, agent, inherited)
         agent.inventory.update(tile.shelter_storage)
         tile.shelter_storage.clear()
         agent.home = agent.position
         self.event_log.appendleft(f"{agent.name} claimed an empty shelter")
         self.trace.record("shelter.claimed", {"agent": agent.id, "position": agent.position,
-            "previous_owner": previous_owner, "inherited": inherited, "tick": self.tick})
+            "previous_owner": previous_owner, "inherited": inherited, "weapon_durability": condition, "tick": self.tick})
         return Observation("claim_shelter", "claimed shelter" + (" and inherited stored resources" if inherited else ""),
                            {"position": agent.position, "inherited": inherited})
 
@@ -727,6 +743,7 @@ class Simulation:
         self.world.tile(position).shelter_residents.clear()
         destroyed_storage = dict(self.world.tile(position).shelter_storage)
         self.world.tile(position).shelter_storage.clear()
+        self.world.tile(position).weapon_durability.clear()
         self.world.tile(position).shelter_capacity = 1
         self.last_lightning = (position, self.tick)
         result = Observation("lightning", "lightning destroyed shelter" if destroyed else "lightning struck ground",
@@ -926,7 +943,7 @@ class Simulation:
             if hunt and distance <= 1:
                 if self.tick < predator.next_attack_tick:
                     continue
-                damage = 30 if predator.kind == "bear" else 7
+                damage = DEFAULTS["combat"][f"{predator.kind}_damage"]
                 predator.next_attack_tick = self.tick + (6 if predator.kind == "bear" else 4)
                 health_before = target.health
                 target.health = max(0, target.health - damage)
@@ -976,6 +993,30 @@ class Simulation:
         if not threats or agent.energy < 3:
             raise ValueError("flee requires a visible predator and 3 energy")
         for _ in range(2):
+            # A known intact refuge ends pursuit; pure distance maximization can
+            # strand an exhausted survivor in an endless edge-of-map chase.
+            queue = deque([(agent.position, ())])
+            visited = {agent.position}
+            refuge_step = None
+            while queue:
+                position, path = queue.popleft()
+                if path and position in agent.known_tiles and self.world.tile(position).shelter_owner is not None:
+                    refuge_step = path[0]
+                    break
+                if len(path) >= 8:
+                    continue
+                for dx, dy in self.DIRECTIONS.values():
+                    candidate = position[0] + dx, position[1] + dy
+                    if (candidate not in visited and self.world.passable(candidate)
+                            and all(candidate != predator.position for predator in threats)):
+                        visited.add(candidate)
+                        queue.append((candidate, path + (candidate,)))
+            if refuge_step is not None:
+                agent.position = refuge_step
+                self.lakes.encounter(agent)
+                if self.world.tile(agent.position).shelter_owner is not None or not agent.alive:
+                    break
+                continue
             neighbors = [(agent.position[0] + dx, agent.position[1] + dy)
                          for dx, dy in self.DIRECTIONS.values()]
             neighbors = [pos for pos in neighbors if self.world.passable(pos)]
@@ -995,8 +1036,14 @@ class Simulation:
                          if item.id == predator_id and self.distance(item.position, agent.position) <= 1), None)
         if predator is None or agent.energy < 4 or self.tick < agent.next_attack_tick:
             raise ValueError("attack requires adjacency, 4 energy, and a completed 3-tick cooldown")
-        damage = (25 if agent.inventory["spear"] else 12 if agent.inventory["axe"] else 5) * (0.5 + agent.strength / 10)
+        from .weapons import use
+        rules = DEFAULTS["combat"]
+        equipment = next((item for item in ("spear", "axe", "bow", "knife") if agent.inventory[item]), "hands")
+        chance = rules["bear_melee_hit_chance"] if predator.kind == "bear" else rules["other_hit_chance"]
+        hit = self.combat_random[agent.id].random() < chance
+        damage = rules["unarmed_damage" if equipment == "hands" else f"{equipment}_damage"] * (0.5 + agent.strength / 10) if hit else 0
         predator.health = max(0, predator.health - damage)
+        use(self, agent, equipment, "attack")
         predator.provoked_until = self.tick + 12
         agent.energy -= 4
         agent.next_attack_tick = self.tick + 3
@@ -1009,14 +1056,14 @@ class Simulation:
             agent.thirst = max(0, agent.thirst - hydration)
             self.trace.record("survivor.kill_reward", {"agent": agent.id, "predator": predator.id,
                 "kind": predator.kind, **reward, "hunger": agent.hunger, "thirst": agent.thirst})
-        outcome = "defeated" if not predator.alive else f"hit for {damage}"
+        outcome = "defeated" if not predator.alive else f"hit for {damage}" if hit else "missed"
         self.trace.record("predator.defended", {"agent": agent.id, "predator": predator.id,
-                                              "damage": damage, "defeated": not predator.alive})
+                                              "damage": damage, "hit": hit, "equipment": equipment, "defeated": not predator.alive})
         self.event_log.appendleft(f"{agent.name} {outcome} {predator.kind}")
         recovery = (f"; recovered {reward['hunger_recovered']:g} hunger and "
                     f"{reward['thirst_recovered']:g} thirst" if reward else "")
         return Observation("attack", f"{outcome} {predator.kind}{recovery}",
-                           {"predator_id": predator.id, "equipment": "spear" if agent.inventory["spear"] else "axe" if agent.inventory["axe"] else "hands", **reward})
+                           {"predator_id": predator.id, "equipment": equipment, "hit": hit, "damage": damage, **reward})
 
     def rest(self, agent: Survivor) -> Observation:
         threatened = bool(self.threatening_predators(agent) or self.wildlife.threats(agent))
@@ -1217,7 +1264,8 @@ class Simulation:
         if tile.resources[resource] <= 0:
             agent.known_resources.get(resource, set()).discard(source)
             raise ValueError(f"no {resource} at {agent.position}")
-        amount = (2 if resource == Resource.WOOD.value and agent.inventory["axe"] else 1) + (1 if agent.strength >= 8 else 0)
+        equipment = "axe" if resource == "wood" and agent.inventory["axe"] else "hands"
+        amount = (2 if equipment == "axe" else 1) + (1 if agent.strength >= 8 else 0)
         amount = min(amount, tile.resources[resource])
         tile.resources[resource] -= amount
         if tile.resources[resource] == 0:
@@ -1226,12 +1274,12 @@ class Simulation:
         if resource == "wood":
             agent.wood_gathered += amount
         agent.energy = max(0.0, agent.energy - 2.0)
+        from .weapons import use
+        use(self, agent, equipment, "gather")
         return Observation("gather", f"gathered {amount} {resource}", {"resource": resource, "amount": amount, "position": source,
-            "equipment": "axe" if resource == "wood" and agent.inventory["axe"] else "hands"})
+            "equipment": equipment})
 
     def craft(self, agent: Survivor, item: str) -> Observation:
-        if item == "fishing_net" and not self.features["fishing_nets"]:
-            raise ValueError("net fishing is disabled")
         from .progression import RECIPES
         if item not in RECIPES:
             raise ValueError(f"unknown recipe: {item}")
@@ -1242,7 +1290,10 @@ class Simulation:
             raise ValueError(f"missing ingredients for {item}")
         for name, count in recipe.items():
             agent.inventory[name] -= count
+        from .weapons import synchronize
+        synchronize(agent)
         agent.inventory[item] += 1
+        synchronize(agent)
         if item == "bow":
             self.learn_skill(agent, "hunting", "bow practice")
         agent.energy = max(0.0, agent.energy - 2.0)
@@ -1269,8 +1320,6 @@ class Simulation:
         return Observation("eat", f"ate {item}", {"hunger": agent.hunger})
 
     def learn_skill(self, agent: Survivor, skill: str, source: str) -> None:
-        if skill == "net_fishing" and not self.features["fishing_nets"]:
-            raise ValueError("net fishing is disabled")
         from .progression import RULES, IslandSkills, missing_prerequisites
         if skill not in RULES or skill in agent.learned_skills:
             return
@@ -1422,6 +1471,11 @@ class SurvivalPolicy:
         cautious_preparation = (agent.social_traits.caution >= 70
             and self.sim.predator_interval is not None
             and self.sim.tick >= self.sim.predator_interval - 50)
+        from .weapons import CAPACITY, remaining
+        if (agent.intelligence >= 70 and agent.inventory["spear"] == 1
+                and remaining(agent, "spear") <= CAPACITY["spear"] // 2
+                and "spear" in agent.learned_skills and (recent_danger or cautious_preparation)):
+            return "Prepare personal defenses"
         if ("spear" in agent.learned_skills and not agent.inventory["spear"]
                 and (recent_danger or cautious_preparation)):
             return "Prepare personal defenses"
@@ -1793,6 +1847,10 @@ class SurvivalPolicy:
             return ToolCall("sleep"), False
         if sid.startswith("locate-"):
             target = sid.removeprefix("locate-")
+            if target == "water":
+                reservoir = self.sim.homestead.reservoirs.get(agent.home) if self.sim.home_is_valid(agent) else None
+                if agent.inventory["water"] or (reservoir and reservoir.water > 0):
+                    return ToolCall("observe_surroundings"), True
             known = self._target(agent, target)
             return (ToolCall("observe_surroundings"), True) if known is not None else (self._explore(agent), False)
         if sid in {"reach-water", "reach-shelter"}:
@@ -1968,9 +2026,6 @@ class SurvivalPolicy:
         priorities = agent.behavior.get("priorities", [])
         if priorities and priorities.index("learn_skills") > priorities.index("explore"):
             return None
-        net_action = self._net_action(agent)
-        if net_action:
-            return net_action
         clothing = self._clothing_action(agent)
         if clothing:
             return clothing
@@ -2069,40 +2124,7 @@ class SurvivalPolicy:
             return ToolCall("rest")
         return ToolCall("hunt", {"animal_id": target.id})
 
-    def _net_action(self, agent: Survivor) -> ToolCall | None:
-        if not self.sim.features["fishing_nets"]:
-            return None
-        deployed = self.sim.lakes.owned(agent)
-        if deployed:
-            distance = self.sim.distance(agent.position, deployed.position)
-            if deployed.catch and agent.inventory["fish"] < 3 and distance <= 6:
-                if distance <= 1:
-                    return ToolCall("collect_net") if agent.energy >= 2 else ToolCall("rest")
-                return ToolCall("move", {"direction": self._direction_for(agent, deployed.position)})
-            return None
-        if "net_fishing" not in agent.learned_skills:
-            return None
-        lakes = [pos for pos, terrain in agent.known_tiles.items() if terrain == Terrain.LAKE]
-        if not lakes or agent.behavior.get("preferences", {}).get("food") == "berries":
-            return None
-        target = min(lakes, key=lambda pos: (self.sim.distance(agent.position, pos), pos))
-        if self.sim.distance(agent.position, target) > 6:
-            return None
-        if not agent.inventory["fishing_net"]:
-            return self._craft_progress(agent, "fishing_net")
-        if agent.energy < 3:
-            return ToolCall("rest")
-        if self.sim.lakes.site(agent) is not None:
-            return ToolCall("place_net")
-        return ToolCall("move", {"direction": self._direction_for(agent, target)})
-
     def _fishing_food(self, agent: Survivor) -> ToolCall | None:
-        net = self.sim.lakes.owned(agent) if self.sim.features["fishing_nets"] else None
-        if net and net.catch:
-            if self.sim.distance(agent.position, net.position) <= 1 and agent.energy >= 2:
-                return ToolCall("collect_net")
-            if agent.hunger < 80:
-                return ToolCall("move", {"direction": self._direction_for(agent, net.position)})
         lakes = [pos for pos, terrain in agent.known_tiles.items() if terrain == Terrain.LAKE and self.sim.world.tile(pos).fish_stock > 0]
         food = agent.behavior.get("preferences", {}).get("food", "adaptive")
         if "fishing" not in agent.learned_skills or not lakes or (agent.inventory["berries"] and food != "fish"):

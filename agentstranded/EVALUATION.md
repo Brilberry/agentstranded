@@ -13,12 +13,12 @@ From the repository with its virtualenv activated (development dependencies inst
 python -m agentstranded.evaluate --config agentstranded/configs/evaluation-smoke.json
 ```
 
-This runs two seeds × three variants × at most 1,600 ticks, without pygame, a model,
+This runs two seeds × two variants × at most 1,600 ticks, without pygame, a model,
 postmortem inference or browser launch. It prints progress and the report path.
 Open the generated `evaluation-runs/<run>/report.html` yourself. `results.json`
 contains all machine-readable results and provenance.
 
-For the larger development suite (20 seeds, 4,000 ticks, same three variants):
+For the larger development suite (20 seeds, 29,200 ticks, baseline and no-alligators):
 
 ```sh
 python -m agentstranded.evaluate
@@ -67,9 +67,9 @@ are separate experiments, NOT official tournament results using the original set
 
 Allowed variant overrides:
 
-- `features`: optional booleans `fishing_nets` / `alligators`; omitted flags use
-  organizer defaults. Nets disabled means no discovery, teaching, crafting,
-  deployment, passive catching or automatic net-policy investment. Alligators
+- `features`: optional boolean `alligators`; omitted flags use
+  organizer defaults. Fishing nets have been removed entirely. Legacy
+  `fishing_nets: false` is accepted as a no-op; `true` is rejected. Alligators
   disabled removes attacks and caution-based avoidance, not just damage.
 - `predator_interval`: positive integer or null (disable scheduled predators).
 - `resource_scale`: finite number greater than zero, at most 10.
@@ -79,8 +79,9 @@ Allowed variant overrides:
 
 No arbitrary code, class names, models or unrecognized configuration keys are
 accepted. Change one thing per candidate to make results interpretable. For
-example, baseline versus no-nets estimates the effect of removing nets, not the
-effect of adding them (the delta sign is candidate minus baseline).
+example, disabling alligators removes attacks AND cautious routing, not just damage
+(the delta sign is candidate minus baseline). Archived pre-removal net comparisons
+are historical results, not configurations to rerun against this engine.
 
 ## Implemented measurements
 
@@ -153,15 +154,107 @@ scores. Inspect the per-seed differences and evidence, not only the average. All
 alive-at-cap survivors are censored; V1 reports restricted lifetimes and does not
 pretend to estimate their eventual deaths or provide Kaplan–Meier estimates.
 
-Initial-environment hashes should match for net/alligator ablations. Resource or
+Initial-environment hashes should match for alligator ablations. Resource or
 starting-season experiments intentionally change that hash and are labeled rather
 than silently treated as matching environments. Validate conclusions on held-out
 seeds and more maps/teams/seasons before changing default balance.
 
+## Controlled scenarios
+
+```sh
+python -m agentstranded.evaluation_scenarios --events
+```
+
+The default [controlled suite](configs/evaluation-controlled.json) runs 20 seeds ×
+15 authored cases. Like the broad runner, it writes `results.json`, `report.html`
+and optional compressed per-case event archives into a new `evaluation-runs/`
+directory. `--output` selects a new destination; `--config` selects a JSON containing
+exactly `schema_version: 1`, `seeds` (same limits as above) and `scenarios` (a nonempty
+list of distinct names from the table). No executable plugins or arbitrary setup
+overrides are accepted. There is no model, UI or automatic browser launch.
+
+| Scenario | Controller | Condition / question | Tick cap |
+| --- | --- | --- | --- |
+| `bear-unarmed` | Fixed duel | Unarmed survivor versus one hungry 150-HP bear | 40 |
+| `bear-spear` | Fixed duel | Same scene, spear supplied; preparedness changes the duel | 40 |
+| `bear-worn-spear` | Fixed duel | Same scene, only four spear uses remaining | 40 |
+| `bear-shelter` | Fixed wait | Survivor stays in an owned shelter; attacks must remain zero | 40 |
+| `bear-policy` | Normal policy | Spear supplied, but survivor can choose flight instead of fighting | 40 |
+| `water-adjacent` | Normal policy | Thirst 80, known river one cell away | 80 |
+| `water-distant` | Normal policy | Same needs, known river eight Manhattan steps away | 80 |
+| `water-carried` | Normal policy | Two water units and a flask, no natural water | 80 |
+| `water-absent` | Normal policy | No water at all: negative availability control | 80 |
+| `hunt-rabbit` | Fixed hunter | Skilled bow user versus one rabbit | 80 |
+| `hunt-deer` | Fixed hunter | Same equipment, one deer | 80 |
+| `hunt-boar` | Fixed hunter | Same equipment, one retaliating boar | 80 |
+| `hunt-rabbit-policy` | Normal policy | Same rabbit scene; does normal policy hunt and eat it? | 80 |
+| `hunt-no-bow` | Fixed negative control | One hunt request without a bow must be rejected | 80 |
+| `hunt-untrained` | Fixed negative control | Bow supplied without bow/hunting knowledge; request must be rejected | 80 |
+
+Each trial has one standardized survivor (intelligence 50 internally, strength and
+endurance 5, personality 50 internally, visibility 3), a 9×9 grass arena bounded by
+mountains, fixed sunny spring weather at 20°C, no scheduled predators/lightning,
+no berries/wood/stone, and no alligators/nets. Hunger/thirst start at zero except
+water cases (thirst 80) and hunting cases (hunger 65). The survivor starts at
+(12,12), the bear/prey at (13,12). The hunting arena includes a river at (12,11).
+Natural needs, cooldowns, animal movement/fleeing, hit randomness, damage, tool
+validation, resource rewards and food consumption still use production code.
+Seeded RNG streams remain in use; maps/weather/traits are fixed, not randomized.
+Known terrain is supplied in water cases to isolate access/navigation from discovery.
+Hunting skills/equipment are supplied, so these cases do not measure skill learning.
+
+Fixed duels repeatedly attack when legal and wait during cooldowns, without moving
+or recovering. The fixed hunter tracks the authored prey's position even outside
+visibility, pursues it, shoots only through the normal visibility/tool checks, and
+eats raw meat when hungry. It is an explicitly privileged mechanics probe, NOT a
+legal competition controller. Negative controls request one illegal hunt and then
+wait. Normal-policy cases retain the game's unmodified rules/behavior selectors.
+All actions execute through the real tool registry and `Simulation.step()`.
+Artificial arenas and supplied equipment are evaluation-only; gameplay is unchanged.
+
+Reports add survival/HP, bear defeat/attack counts, drinks, prey kills, meat meals,
+hunting attempts/rejections, a prepared-state manifest and per-case replay hashes.
+The bbagents runner grades execution integrity separately from narrow scenario
+contracts: shelter protection, use of available water, absence of phantom water,
+and rejection of unqualified hunting. The scoped 20% fresh-spear bear target is
+evaluated over the larger combat suite, not as a pass/fail on an individual duel.
+No hunting-success target is declared yet. Zero applicable checks is not proof of good balance.
+CLI exit 1 can therefore mean a **completed diagnostic found a policy/mechanics
+problem**, not just a runner error. Failed checks are highlighted in HTML; evidence
+is preserved. Ctrl+C saves partial results and exits 130. Unrelated scenarios are
+not combined into paired score deltas. Competition score shown by the shared report
+is not a meaningful arena ranking; use scenario endpoints instead.
+
+Initial validation found `water-carried` failing: with no known natural source,
+the normal policy remained in `locate-water`. This is now fixed: carried water or
+a stocked valid home reservoir satisfy that plan prerequisite. The diagnostic
+remains active as a regression check. Original reports are preserved unchanged.
+
+## One-year and combat balance experiments
+
+See [Combat and year-survival rules](COMBAT_AND_LONGEVITY.md) for the assumptions,
+weapon lifetimes and limits of the 20% bear target.
+
+```sh
+python -m agentstranded.evaluate --config agentstranded/configs/evaluation-easy-year.json --events
+python -m agentstranded.evaluation_scenarios --config agentstranded/configs/evaluation-combat.json --events
+```
+
+A year is `365 × 80 = 29,200` ticks. The easy-year configuration has three initial
+development seeds, all seasons, the real easy map and an explicitly budget-valid
+100-point candidate team. It is a hypothesis about useful settings, not an optimal
+team or a guarantee. The team concentrates intelligence/endurance/perception in
+two survivors, avoids combat, uses private shelters and responds to needs early.
+The remaining survivors have fewer points; all five spawn normally. Inspect
+`survived_one_year` per survivor and in each run summary; do not count early deaths
+as reaching the target simply because the configured horizon is one year. A
+living survivor at the cap has achieved the target but is still right-censored.
+The small smoke suite remains a quick regression tool, not a longevity benchmark.
+
 ## Next increments (not implemented)
 
-Controlled bear/water/hunting scenarios; explicit encounter and emergency episodes;
-full skill eligibility/adoption funnels; resource conservation/supply accounting;
+Explicit natural encounter and emergency episodes; full skill eligibility/adoption
+funnels; resource conservation/supply accounting;
 calibrated predeclared balance graders; cross-revision report comparison; uncertainty
 intervals and survival analysis; offline ingestion of legacy logs; and model-assisted
 trials. See METRICS_CATALOG.md for the complete backlog, not a promise of current coverage.

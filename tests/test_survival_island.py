@@ -94,11 +94,13 @@ def test_predators_arrive_on_schedule():
 
 
 def test_survivor_can_craft_spear_and_defeat_predator():
+    from types import SimpleNamespace
     from agentstranded.simulation import Predator
     from bbagents import ToolCall
 
     simulation = Simulation()
     agent = simulation.agents[0]
+    simulation.combat_random[agent.id] = SimpleNamespace(random=lambda: 0)
     agent.inventory["wood"] = 3
     simulation.learn_skill(agent, "spear", "test teacher")
     simulation.tools[agent.id].execute(ToolCall("craft", {"item": "spear"}))
@@ -106,7 +108,7 @@ def test_survivor_can_craft_spear_and_defeat_predator():
     simulation.predators.append(wolf)
     assert simulation.policy.decide(agent).tool_name == "attack"
     simulation.tools[agent.id].execute(ToolCall("attack", {"predator_id": wolf.id}))
-    assert wolf.health == 20
+    assert wolf.health == 15
     simulation.tick += 3
     simulation.tools[agent.id].execute(ToolCall("attack", {"predator_id": wolf.id}))
     assert not wolf.alive
@@ -284,7 +286,7 @@ def test_wolf_pack_shares_target_while_bear_hunts_independently():
     simulation.tick = 4
     simulation._update_predators()
     assert first.health == 93
-    assert second.health == 70  # only the independent bear attacks this survivor
+    assert second.health == 65  # only the independent bear attacks this survivor
     assert simulation.predators[1].position == (12, 10)  # joins pack's prey, despite nearby second agent
 
 
@@ -303,7 +305,7 @@ def test_three_adjacent_wolves_deal_less_combined_damage_than_one_bear():
     assert agent.health == 79
     simulation.predators = [Predator("bear", "bear", agent.position, 75)]
     simulation._update_predators()
-    assert agent.health == 49
+    assert agent.health == 44
 
 
 def test_bear_attack_cooldown_persists_when_target_changes():
@@ -317,7 +319,7 @@ def test_bear_attack_cooldown_persists_when_target_changes():
     simulation.predators = [bear]
     simulation.tick = 2
     simulation._update_predators()
-    assert first.health == 70
+    assert first.health == 65
     first.position = (25, 25)
     for tick in (2, 3, 4, 5, 6, 7):
         simulation.tick = tick
@@ -325,7 +327,7 @@ def test_bear_attack_cooldown_persists_when_target_changes():
         assert second.health == 100
     simulation.tick = 8
     simulation._update_predators()
-    assert second.health == 70
+    assert second.health == 65
 
 
 def test_wolf_attacks_every_four_ticks_with_increased_damage():
@@ -425,10 +427,12 @@ def test_sleep_advances_across_ticks_and_restores_saved_plan():
 
 
 def test_predator_interrupts_sleep_and_resume_waits_until_safe():
+    from types import SimpleNamespace
     from agentstranded.simulation import Predator
 
     simulation = Simulation(predator_interval=None)
     agent = simulation.agents[0]
+    simulation.combat_random[agent.id] = SimpleNamespace(random=lambda: 0)
     goal = agent.current_plan.goal
     agent.inventory["spear"] = 1
     simulation.sleep(agent)
@@ -437,7 +441,7 @@ def test_predator_interrupts_sleep_and_resume_waits_until_safe():
     simulation.step()
     assert agent.sleep_remaining == 0
     assert agent.resume_pending
-    assert wolf.health == 20  # immediate defense on the wake tick
+    assert wolf.health == 15  # immediate defense on the wake tick
     assert simulation.trace.events_named("sleep.interrupted")
     episode = agent.memory.retrieve("sleep")[0].record
     assert episode.metadata["reason"] == "predator"

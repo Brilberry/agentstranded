@@ -5,7 +5,7 @@
 Treat the island like a sports broadcast: short play-by-play and occasional
 analysis, not continuous narration or another death report. Example style:
 
-> Tick 1,000: Ari has her first net in the water! That opens another food option,
+> Tick 1,000: Ari has caught her first fish! That opens another food option,
 > but Bo is still searching for shelter as night approaches.
 
 Names, actions and timing must be supported by events. Avoid invented thoughts,
